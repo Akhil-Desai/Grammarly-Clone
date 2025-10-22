@@ -12,7 +12,14 @@ export default function App() {
     profession: 'General',
     language: 'English'
   })
+  const [menuOpen, setMenuOpen] = useState(false)
   const editorRef = useRef<HTMLDivElement | null>(null)
+
+  const exampleDoc = `This is a sample document.
+
+it includes teh common typo, and  two  spaces in places , plus lowercase after a sentence. Don't worry — you can try the Improve Writing option to make it formal or shorter.
+
+Also, check how the grammar rules handle spacing and Capitalization.`
 
   // Utilities for caret save/restore
   function getCaretOffset(root: HTMLElement): number | null {
@@ -155,7 +162,6 @@ export default function App() {
     setLoading(true)
     try {
       const res = await apiRewrite(text, voice)
-      // pick suggestion by formality
       const target = voice.formality === 'Formal'
         ? res.rewrites.find(r => r.label === 'More formal')
         : res.rewrites.find(r => r.label === 'More persuasive')
@@ -183,7 +189,18 @@ export default function App() {
   return (
     <div style={{ fontFamily: 'Inter, ui-sans-serif, system-ui', padding: 16, paddingRight: 336 }}>
       <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <h1 style={{ margin: 0, fontSize: 20 }}>Grammarly Clone MVP</h1>
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button aria-label="Open menu" onClick={() => setMenuOpen(v => !v)}>☰</button>
+          <h1 style={{ margin: 0, fontSize: 20 }}>My Document #1</h1>
+          {menuOpen && (
+            <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: 8, width: 220, border: '1px solid #e5e7eb', borderRadius: 8, background: '#fff', boxShadow: '0 4px 12px rgba(0,0,0,0.08)', zIndex: 50 }}>
+              <div style={{ padding: 8, borderBottom: '1px solid #f3f4f6', fontSize: 12, color: '#6b7280' }}>Menu</div>
+              <button style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 10px', background: 'transparent' }} onClick={() => { setText(''); setMenuOpen(false) }}>Home</button>
+              <button style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 10px', background: 'transparent' }} onClick={() => { setText(exampleDoc); setMenuOpen(false) }}>New Document</button>
+              <button style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 10px', background: 'transparent' }} onClick={() => { window.alert('Grammarly Clone MVP: basic editor, inline checks, simple AI actions.'); setMenuOpen(false) }}>About this MVP</button>
+            </div>
+          )}
+        </div>
       </header>
 
       <div style={{ marginTop: 12 }}>
@@ -194,7 +211,7 @@ export default function App() {
             role="textbox"
             aria-multiline
             onInput={(e) => setText((e.currentTarget as HTMLDivElement).innerText || '')}
-            style={{ width: '95%', height: 360, fontSize: 16, padding: 12, marginTop: 8, overflow: 'auto', border: '1px solid #e5e7eb', borderRadius: 8, whiteSpace: 'pre-wrap', outline: 'none' }}
+            style={{ width: '95%', height: 360, fontSize: 16, padding: 12, marginTop: 8, overflow: 'auto', border: '1px solid transparent', borderRadius: 8, whiteSpace: 'pre-wrap', outline: '2px solid transparent', boxShadow: 'none' }}
           />
         </div>
 

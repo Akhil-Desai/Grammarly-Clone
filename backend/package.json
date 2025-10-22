@@ -1,0 +1,12 @@
+{
+  "name": "grammarly-clone-backend",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js"
+  },
+  "dependencies": {}
+}
+

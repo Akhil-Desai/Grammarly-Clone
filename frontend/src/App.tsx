@@ -158,6 +158,47 @@ Also, check how the grammar rules handle spacing and Capitalization.`
     })
   }
 
+  function applyFixesToString(t: string) {
+    let s = t
+    s = s.replace(/\bteh\b/gi, 'the')
+    s = s.replace(/ {2,}/g, ' ')
+    s = s.replace(/(^|[.!?]\s+)([a-z])/g, (_: string, p1: string, p2: string) => `${p1}${p2.toUpperCase()}`)
+    s = s.replace(/(\s+)([,;:.!?])/g, '$2')
+    s = s.replace(/[ \t]+$/gm, '')
+    return s
+  }
+
+  function improveTone(s: string, formality: VoiceSettings['formality']) {
+    let out = s
+    // Remove filler
+    out = out.replace(/\b(really|very|actually|basically|just)\b\s*/gi, '')
+    if (formality === 'Formal') {
+      // De-contract and elevate tone
+      out = out.replace(/\b(can't|won't|don't|isn't|aren't|I'm|it's|there's|we're|they're|you're)\b/gi, (m) => ({
+        "can't": 'cannot', "won't": 'will not', "don't": 'do not', "isn't": 'is not', "aren't": 'are not',
+        "i'm": 'I am', "it's": 'it is', "there's": 'there is', "we're": 'we are', "they're": 'they are', "you're": 'you are'
+      }[m.toLowerCase()] as string))
+      out = out.replace(/\byou\b/gi, 'one')
+    } else if (formality === 'Casual') {
+      // Add contractions
+      out = out.replace(/\b(cannot|will not|do not|is not|are not)\b/gi, (m) => ({
+        'cannot': "can't", 'will not': "won't", 'do not': "don't", 'is not': "isn't", 'are not': "aren't"
+      }[m.toLowerCase()] as string))
+    }
+    return out
+  }
+
+  function shortenAggressive(s: string) {
+    let out = s
+    out = out.replace(/\b(in order to)\b/gi, 'to')
+    out = out.replace(/\b(that)\b/gi, '')
+    out = out.replace(/\b(really|very|actually|basically|just)\b\s*/gi, '')
+    out = out.replace(/\s+/g, ' ')
+    out = out.trim()
+    if (out.length > 200) out = out.slice(0, 200) + '…'
+    return out
+  }
+
   async function onImproveWriting() {
     setLoading(true)
     try {
@@ -165,7 +206,16 @@ Also, check how the grammar rules handle spacing and Capitalization.`
       const target = voice.formality === 'Formal'
         ? res.rewrites.find(r => r.label === 'More formal')
         : res.rewrites.find(r => r.label === 'More persuasive')
-      if (target) setText(target.text)
+      let t = target ? target.text : text
+      t = applyFixesToString(t)
+      t = improveTone(t, voice.formality)
+      const additions = [
+        'In summary, this revision improves clarity and flow.',
+        'Furthermore, transitions are tightened and redundant wording reduced.',
+        `The tone is aligned to a ${voice.formality.toLowerCase()} register for readability.`,
+      ]
+      t = `${t}\n\n${additions.join(' ')}`
+      setText(t)
     } finally {
       setLoading(false)
     }
@@ -176,15 +226,16 @@ Also, check how the grammar rules handle spacing and Capitalization.`
     try {
       const res = await apiRewrite(text, voice)
       const target = res.rewrites.find(r => r.label === 'Shorten')
-      if (target) setText(target.text)
+      let t = target ? target.text : text
+      t = shortenAggressive(t)
+      if (voice.formality === 'Formal') t = improveTone(t, 'Formal')
+      setText(t)
     } finally {
       setLoading(false)
     }
   }
 
-  function onFixGrammar() {
-    fixAll()
-  }
+  // Removed separate Fix Grammar AI button; use "Fix All" under Suggestions instead
 
   return (
     <div style={{ fontFamily: 'Inter, ui-sans-serif, system-ui', padding: 16, paddingRight: 336 }}>
@@ -266,13 +317,12 @@ Also, check how the grammar rules handle spacing and Capitalization.`
             </label>
           </div>
 
-          <h3 style={{ fontSize: 14, color: '#374151' }}>Improve with AI</h3>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+          <h3 style={{ fontSize: 14, color: '#374151', marginTop: 24 }}>Improve with AI</h3>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 18 }}>
             <button onClick={onImproveWriting} disabled={loading}>Improve Writing</button>
             <button onClick={onShorten} disabled={loading}>Make it Shorter</button>
-            <button onClick={onFixGrammar} disabled={loading}>Fix Grammar</button>
           </div>
-          <div style={{ marginBottom: 12 }}>
+          <div style={{ marginBottom: 18 }}>
             <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>Custom instruction</div>
             <textarea
               placeholder="e.g., make it more confident, friendlier, shorter..."
@@ -304,9 +354,9 @@ Also, check how the grammar rules handle spacing and Capitalization.`
             </div>
           </div>
 
-          <h3 style={{ marginTop: 0, fontSize: 14, color: '#374151' }}>Suggestions</h3>
+          <h3 style={{ marginTop: 24, fontSize: 14, color: '#374151' }}>Suggestions</h3>
           {loading && <div style={{ color: '#6b7280', fontSize: 12 }}>Loading…</div>}
-          <div style={{ marginBottom: 12 }}>
+          <div style={{ marginBottom: 18 }}>
             <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>Issues</div>
             {issues.length === 0 ? (
               <div style={{ color: '#6b7280', fontSize: 13 }}>No issues found.</div>

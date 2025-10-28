@@ -1,18 +1,31 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { apiCheck, apiRewrite } from './api'
 import type { VoiceSettings } from './types'
+import TopBar from './components/TopBar'
+import SuggestionCard from './components/SuggestionCard'
+import VoiceModal from './components/VoiceModal'
 
 export default function App() {
   const [text, setText] = useState('Hello Grammarly Clone')
   const [issues, setIssues] = useState<{ index: number; word: string; suggestion: string; type: string }[]>([])
   const [loading, setLoading] = useState(false)
+  const [activePanel, setActivePanel] = useState<'review' | 'write'>('review')
+  const [voiceOpen, setVoiceOpen] = useState(false)
+  const promptRef = useRef<HTMLTextAreaElement | null>(null)
+
+  function autosizePrompt() {
+    const el = promptRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    const max = 240 // cap growth
+    el.style.height = Math.min(el.scrollHeight, max) + 'px'
+  }
   const [voice, setVoice] = useState<VoiceSettings>({
     formality: 'Neutral',
     tone: 'Neutral',
     profession: 'General',
     language: 'English'
   })
-  const [menuOpen, setMenuOpen] = useState(false)
   const editorRef = useRef<HTMLDivElement | null>(null)
 
   const exampleDoc = `This is a sample document.
@@ -238,141 +251,108 @@ Also, check how the grammar rules handle spacing and Capitalization.`
   // Removed separate Fix Grammar AI button; use "Fix All" under Suggestions instead
 
   return (
-    <div style={{ fontFamily: 'Inter, ui-sans-serif, system-ui', padding: 16, paddingRight: 336 }}>
-      <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <button aria-label="Open menu" onClick={() => setMenuOpen(v => !v)}>☰</button>
-          <h1 style={{ margin: 0, fontSize: 20 }}>My Document #1</h1>
-          {menuOpen && (
-            <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: 8, width: 220, border: '1px solid #e5e7eb', borderRadius: 8, background: '#fff', boxShadow: '0 4px 12px rgba(0,0,0,0.08)', zIndex: 50 }}>
-              <div style={{ padding: 8, borderBottom: '1px solid #f3f4f6', fontSize: 12, color: '#6b7280' }}>Menu</div>
-              <button style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 10px', background: 'transparent' }} onClick={() => { setText(''); setMenuOpen(false) }}>Home</button>
-              <button style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 10px', background: 'transparent' }} onClick={() => { setText(exampleDoc); setMenuOpen(false) }}>New Document</button>
-              <button style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 10px', background: 'transparent' }} onClick={() => { window.alert('Grammarly Clone MVP: basic editor, inline checks, simple AI actions.'); setMenuOpen(false) }}>About this MVP</button>
+    <div className="app-shell">
+      <div>
+        <TopBar title="My Document #1" />
+        <div className="editor-wrap">
+          <div className="editor-page">
+            <div
+              ref={editorRef}
+              className="editor"
+              contentEditable
+              role="textbox"
+              aria-multiline
+              onInput={(e) => setText((e.currentTarget as HTMLDivElement).innerText || '')}
+            />
+          </div>
+        </div>
+      </div>
+
+      <aside className="sidebar" role="complementary" aria-label={activePanel === 'review' ? 'Review suggestions' : 'Write with generative AI'}>
+        <div className="sidebar-header">
+          <div className="sidebar-top-tabs" role="tablist">
+            <button className="top-tab" role="tab" aria-selected={activePanel==='review'} data-active={activePanel==='review'} onClick={() => setActivePanel('review')}>Review suggestions</button>
+            <button className="top-tab" role="tab" aria-selected={activePanel==='write'} data-active={activePanel==='write'} onClick={() => setActivePanel('write')}>Write with generative AI</button>
+          </div>
+          {activePanel === 'review' && (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <h3 className="sidebar-title">Review suggestions</h3>
+                <span className="pill">{issues.length} items</span>
+              </div>
+              <div className="tabs" role="tablist">
+                <button className="tab correct" role="tab" aria-selected="true" data-active="true">Correctness</button>
+                <button className="tab clarity" role="tab">Clarity</button>
+                <button className="tab engage" role="tab">Engagement</button>
+                <button className="tab delivery" role="tab">Delivery</button>
+              </div>
+            </>
+          )}
+          {activePanel === 'write' && null}
+        </div>
+        <div className="sidebar-inner">
+          {activePanel === 'review' ? (
+            <div role="tabpanel" aria-labelledby="tab-review">
+              {issues.length === 0 ? (
+                <div className="group group-padding"><div className="small muted">No issues found.</div></div>
+              ) : (
+                <div role="list">
+                  {issues.slice(0, 3).map((i, idx) => (
+                    <SuggestionCard
+                      key={idx}
+                      label={i.type === 'spelling' ? 'Spelling' : 'Grammar'}
+                      text={`Replace \"${i.word}\" with \"${i.suggestion}\"`}
+                      category={i.type === 'spelling' ? 'correctness' : 'clarity'}
+                      onUse={() => fixAll()}
+                      onDismiss={() => setIssues(issues.filter((_, j) => j !== idx))}
+                    />
+                  ))}
+                  {issues.length > 3 && (
+                    <div className="muted small" style={{ marginTop: 8 }}>{issues.length - 3} more…</div>
+                  )}
+                </div>
+              )}
+              <div className="section">
+                <button className="btn btn-primary" onClick={fixAll}>Fix All</button>
+              </div>
+            </div>
+          ) : (
+            <div role="tabpanel" aria-labelledby="tab-write">
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: 8 }}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 6 }}>What do you want to do?</div>
+                  <div className="muted">Here are some ideas</div>
+                </div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button className="btn btn-ghost" aria-label="Magic ideas">✦</button>
+                  <button className="btn btn-ghost" aria-label="Voice" onClick={() => setVoiceOpen(true)}>🔈</button>
+                </div>
+              </div>
+              <div className="list">
+                <div className="list-item" onClick={onImproveWriting}>Improve it<span>›</span></div>
+                <div className="list-item" onClick={onShorten}>Identify any gaps<span>›</span></div>
+                <div className="list-item">More ideas<span>›</span></div>
+              </div>
+
+              <div className="section" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button className="btn" onClick={onImproveWriting} disabled={loading}>Improve Writing</button>
+                <button className="btn" onClick={onShorten} disabled={loading}>Make it Shorter</button>
+              </div>
+
+              <div className="prompt-sticky">
+                <textarea
+                  ref={promptRef}
+                  className="prompt-box"
+                  placeholder="Tell us to..."
+                  rows={1}
+                  onInput={autosizePrompt}
+                />
+              </div>
             </div>
           )}
         </div>
-      </header>
-
-      <div style={{ marginTop: 12 }}>
-        <div>
-          <div
-            ref={editorRef}
-            contentEditable
-            role="textbox"
-            aria-multiline
-            onInput={(e) => setText((e.currentTarget as HTMLDivElement).innerText || '')}
-            style={{ width: '95%', height: 360, fontSize: 16, padding: 12, marginTop: 8, overflow: 'auto', border: '1px solid transparent', borderRadius: 8, whiteSpace: 'pre-wrap', outline: '2px solid transparent', boxShadow: 'none' }}
-          />
-        </div>
-
-        <aside
-          style={{
-            position: 'fixed',
-            top: 0,
-            right: 16,
-            width: 320,
-            height: '100vh',
-            border: '1px solid #e5e7eb',
-            borderRadius: 8,
-            padding: 12,
-            overflow: 'auto',
-            background: '#fff',
-            boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
-          }}
-        >
-          <h3 style={{ marginTop: 0, fontSize: 14, color: '#374151' }}>Voice</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
-            <label style={{ fontSize: 12, color: '#374151' }}>
-              Formality
-              <select value={voice.formality} onChange={(e) => setVoice(v => ({ ...v, formality: e.target.value as VoiceSettings['formality'] }))} style={{ display: 'block', width: '100%' }}>
-                <option>Casual</option>
-                <option>Neutral</option>
-                <option>Formal</option>
-              </select>
-            </label>
-            <label style={{ fontSize: 12, color: '#374151' }}>
-              Tone
-              <select value={voice.tone} onChange={(e) => setVoice(v => ({ ...v, tone: e.target.value as VoiceSettings['tone'] }))} style={{ display: 'block', width: '100%' }}>
-                <option>Friendly</option>
-                <option>Neutral</option>
-                <option>Assertive</option>
-              </select>
-            </label>
-            <label style={{ fontSize: 12, color: '#374151' }}>
-              Profession
-              <select value={voice.profession} onChange={(e) => setVoice(v => ({ ...v, profession: e.target.value as VoiceSettings['profession'] }))} style={{ display: 'block', width: '100%' }}>
-                <option>General</option>
-                <option>Student</option>
-                <option>Engineer</option>
-                <option>Marketing</option>
-              </select>
-            </label>
-            <label style={{ fontSize: 12, color: '#374151' }}>
-              Language
-              <select value={voice.language} onChange={(e) => setVoice(v => ({ ...v, language: e.target.value as VoiceSettings['language'] }))} style={{ display: 'block', width: '100%' }}>
-                <option>English</option>
-                <option>Spanish</option>
-              </select>
-            </label>
-          </div>
-
-          <h3 style={{ fontSize: 14, color: '#374151', marginTop: 24 }}>Improve with AI</h3>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 18 }}>
-            <button onClick={onImproveWriting} disabled={loading}>Improve Writing</button>
-            <button onClick={onShorten} disabled={loading}>Make it Shorter</button>
-          </div>
-          <div style={{ marginBottom: 18 }}>
-            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>Custom instruction</div>
-            <textarea
-              placeholder="e.g., make it more confident, friendlier, shorter..."
-              onChange={(e) => (e.currentTarget as HTMLTextAreaElement).value}
-              style={{ width: '100%', maxWidth: '100%', height: 64, fontSize: 13, padding: 8, boxSizing: 'border-box', resize: 'none', display: 'block' }}
-              id="ai-instruction"
-            />
-            <div style={{ marginTop: 6 }}>
-              <button onClick={() => {
-                const el = document.getElementById('ai-instruction') as HTMLTextAreaElement | null
-                const instruction = (el?.value || '').toLowerCase()
-                let t = text
-                if (instruction.includes('short')) {
-                  t = t.length > 160 ? t.slice(0, 160) + '…' : t
-                }
-                if (instruction.includes('formal')) {
-                  t = t.replace(/\b(can't|won't|don't|isn't|aren't)\b/gi, (m) => ({
-                    "can't": 'cannot', "won't": 'will not', "don't": 'do not', "isn't": 'is not', "aren't": 'are not'
-                  }[m.toLowerCase()] as string))
-                }
-                if (instruction.includes('confident')) {
-                  t = 'Clearly, ' + t
-                }
-                if (instruction.includes('friendly')) {
-                  t = t.replace(/\b(one|the user|the customer)\b/gi, 'you')
-                }
-                setText(t)
-              }}>Apply</button>
-            </div>
-          </div>
-
-          <h3 style={{ marginTop: 24, fontSize: 14, color: '#374151' }}>Suggestions</h3>
-          {loading && <div style={{ color: '#6b7280', fontSize: 12 }}>Loading…</div>}
-          <div style={{ marginBottom: 18 }}>
-            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>Issues</div>
-            {issues.length === 0 ? (
-              <div style={{ color: '#6b7280', fontSize: 13 }}>No issues found.</div>
-            ) : (
-              <ul style={{ paddingLeft: 18, margin: 0, color: '#6b7280', fontSize: 14 }}>
-                {issues.map((i, idx) => (
-                  <li key={idx}>{i.type}: "{i.word}" → {i.suggestion}</li>
-                ))}
-              </ul>
-            )}
-            <div style={{ marginTop: 8 }}>
-              <button onClick={fixAll}>Fix All</button>
-            </div>
-          </div>
-        </aside>
-      </div>
+      </aside>
+      <VoiceModal open={voiceOpen} initial={voice} onClose={() => setVoiceOpen(false)} onApply={(v) => setVoice(v)} />
     </div>
   )
 }

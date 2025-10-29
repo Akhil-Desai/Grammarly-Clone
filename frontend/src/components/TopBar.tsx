@@ -17,7 +17,7 @@ export default function TopBar({ title }: TopBarProps) {
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <span className="pill">Goals</span>
-        <span className="pill pill-muted">81 Overall score</span>
+        <span className="pill">83 Overall score</span>
       </div>
     </div>
   )

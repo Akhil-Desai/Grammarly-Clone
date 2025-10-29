@@ -250,10 +250,15 @@ Also, check how the grammar rules handle spacing and Capitalization.`
 
   // Removed separate Fix Grammar AI button; use "Fix All" under Suggestions instead
 
+  function wordCount(input: string) {
+    const words = input.trim().split(/\s+/).filter(Boolean)
+    return words.length
+  }
+
   return (
     <div className="app-shell">
       <div>
-        <TopBar title="My Document #1" />
+        <TopBar title="Untitled document" />
         <div className="editor-wrap">
           <div className="editor-page">
             <div
@@ -262,8 +267,25 @@ Also, check how the grammar rules handle spacing and Capitalization.`
               contentEditable
               role="textbox"
               aria-multiline
-              onInput={(e) => setText((e.currentTarget as HTMLDivElement).innerText || '')}
+              onInput={(e) => setText((e.currentTarget as HTMLDivElement).textContent || '')}
             />
+
+            {/* Floating formatting toolbar + word count (UI only) */}
+            <div className="editor-footer-fixed" aria-hidden>
+              <div className="formatting-toolbar" role="toolbar" aria-label="Formatting">
+                <button className="tool-btn" aria-label="Bold"><strong>B</strong></button>
+                <button className="tool-btn" aria-label="Italic"><em>I</em></button>
+                <button className="tool-btn" aria-label="Underline"><u>U</u></button>
+                <div className="tool-divider" />
+                <button className="tool-btn" aria-label="Heading 1">H1</button>
+                <button className="tool-btn" aria-label="Heading 2">H2</button>
+                <div className="tool-divider" />
+                <button className="tool-btn" aria-label="Bulleted list">•</button>
+                <button className="tool-btn" aria-label="Numbered list">1.</button>
+                <button className="tool-btn" aria-label="Quote">“”</button>
+              </div>
+              <div className="wordcount-chip" aria-label="Word count">{wordCount(text).toLocaleString()} words</div>
+            </div>
           </div>
         </div>
       </div>
@@ -318,39 +340,69 @@ Also, check how the grammar rules handle spacing and Capitalization.`
             </div>
           ) : (
             <div role="tabpanel" aria-labelledby="tab-write">
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: 8 }}>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: 14 }}>
                 <div>
-                  <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 6 }}>What do you want to do?</div>
-                  <div className="muted">Here are some ideas</div>
+                  <div style={{ fontWeight: 700, fontSize: 22, marginBottom: 6 }}>What do you want to do?</div>
+                  <div className="muted" style={{ fontSize: 16 }}>Here are some ideas</div>
                 </div>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <button className="btn btn-ghost" aria-label="Magic ideas">✦</button>
-                  <button className="btn btn-ghost" aria-label="Voice" onClick={() => setVoiceOpen(true)}>🔈</button>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button className="btn-icon" aria-label="Magic ideas">
+                    <svg className="idea-icon" viewBox="0 0 24 24" aria-hidden>
+                      <path d="M12 2l1.8 3.8L18 8l-4.2 2.2L12 14l-1.8-3.8L6 8l4.2-2.2L12 2z" fill="#0FAD8F"/>
+                    </svg>
+                  </button>
+                  <button className="btn-icon" aria-label="Voice" onClick={() => setVoiceOpen(true)}>
+                    <svg className="idea-icon" viewBox="0 0 24 24" aria-hidden>
+                      <path d="M12 3a3 3 0 0 1 3 3v6a3 3 0 1 1-6 0V6a3 3 0 0 1 3-3zm-5 8a5 5 0 1 0 10 0h2a7 7 0 0 1-6 6.93V21h-2v-3.07A7 7 0 0 1 5 11h2z" fill="#111827"/>
+                    </svg>
+                  </button>
                 </div>
               </div>
-              <div className="list">
-                <div className="list-item" onClick={onImproveWriting}>Improve it<span>›</span></div>
-                <div className="list-item" onClick={onShorten}>Identify any gaps<span>›</span></div>
-                <div className="list-item">More ideas<span>›</span></div>
+              <div className="ideas-grid">
+                <div className="idea-card" onClick={onImproveWriting}>
+                  <div className="idea-left">
+                    <svg className="idea-icon" viewBox="0 0 24 24" aria-hidden>
+                      <path d="M4 17l6-6 3 3 7-7" stroke="#0FAD8F" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    <span>Improve it</span>
+                  </div>
+                  <span className="idea-chevron">›</span>
+                </div>
+                <div className="idea-card" onClick={onShorten}>
+                  <div className="idea-left">
+                    <svg className="idea-icon" viewBox="0 0 24 24" aria-hidden>
+                      <path d="M10 3l2 4 4 .6-3 3 .7 4.4L10 13l-3.7 2 1-4.4-3-3L8 7.1 10 3z" fill="#111827"/>
+                    </svg>
+                    <span>Identify any gaps</span>
+                  </div>
+                  <span className="idea-chevron">›</span>
+                </div>
+                <div className="idea-card">
+                  <div className="idea-left">
+                    <svg className="idea-icon" viewBox="0 0 24 24" aria-hidden>
+                      <path d="M4 4h7v7H4V4zm9 0h7v7h-7V4zM4 13h7v7H4v-7zm9 0h7v7h-7v-7z" fill="#111827"/>
+                    </svg>
+                    <span>More ideas</span>
+                  </div>
+                  <span className="idea-chevron">›</span>
+                </div>
               </div>
 
-              <div className="section" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <button className="btn" onClick={onImproveWriting} disabled={loading}>Improve Writing</button>
-                <button className="btn" onClick={onShorten} disabled={loading}>Make it Shorter</button>
-              </div>
-
-              <div className="prompt-sticky">
-                <textarea
-                  ref={promptRef}
-                  className="prompt-box"
-                  placeholder="Tell us to..."
-                  rows={1}
-                  onInput={autosizePrompt}
-                />
-              </div>
+              {/* Buttons removed per spec to match Grammarly */}
             </div>
           )}
         </div>
+        {activePanel === 'write' && (
+          <div className="sidebar-footer">
+            <textarea
+              ref={promptRef}
+              className="prompt-box"
+              placeholder="Tell us to..."
+              rows={1}
+              onInput={autosizePrompt}
+            />
+          </div>
+        )}
       </aside>
       <VoiceModal open={voiceOpen} initial={voice} onClose={() => setVoiceOpen(false)} onApply={(v) => setVoice(v)} />
     </div>

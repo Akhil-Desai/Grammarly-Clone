@@ -12,6 +12,7 @@ export default function App() {
   const [activePanel, setActivePanel] = useState<'review' | 'write'>('review')
   const [openSuggestionIdx, setOpenSuggestionIdx] = useState<number | null>(null)
   const [voiceOpen, setVoiceOpen] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(true)
   const promptRef = useRef<HTMLTextAreaElement | null>(null)
 
   function autosizePrompt() {
@@ -257,7 +258,7 @@ Also, check how the grammar rules handle spacing and Capitalization.`
   }
 
   return (
-    <div className="app-shell">
+    <div className="app-shell" style={{ ['--sidebar-width' as any]: sidebarOpen ? '420px' : '0px' }}>
       <div>
         <TopBar title="Untitled document" />
         <div className="editor-wrap">
@@ -291,19 +292,25 @@ Also, check how the grammar rules handle spacing and Capitalization.`
         </div>
       </div>
 
-      <aside className="sidebar" role="complementary" aria-label={activePanel === 'review' ? 'Review suggestions' : 'Write with generative AI'}>
+      <aside className="sidebar" role="complementary" aria-label={activePanel === 'review' ? 'Review suggestions' : 'Write with generative AI'} aria-hidden={!sidebarOpen}>
         <div className="sidebar-header">
           <div className="sidebar-top-tabs" role="tablist">
             <button className="top-tab" role="tab" aria-selected={activePanel==='review'} data-active={activePanel==='review'} onClick={() => setActivePanel('review')}>Review suggestions</button>
             <button className="top-tab" role="tab" aria-selected={activePanel==='write'} data-active={activePanel==='write'} onClick={() => setActivePanel('write')}>Write with generative AI</button>
           </div>
+          {/* collapse control moved to floating handle outside header */}
+          {activePanel === 'write' && null}
+        </div>
+        <div className="sidebar-inner">
           {activePanel === 'review' && (
             <>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <h3 className="sidebar-title">Review suggestions</h3>
-                <span className="pill">{issues.length} items</span>
+              <div className="section-band">
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <h3 className="sidebar-title">Review suggestions</h3>
+                  <span className="count-chip" aria-label={`${issues.length} suggestions`}>{issues.length}</span>
+                </div>
               </div>
-              <div className="tabs" role="tablist">
+              <div className="tabs" role="tablist" style={{ marginTop: 12 }}>
                 <button className="tab correct" role="tab" aria-selected="true" data-active="true">Correctness</button>
                 <button className="tab clarity" role="tab">Clarity</button>
                 <button className="tab engage" role="tab">Engagement</button>
@@ -311,13 +318,19 @@ Also, check how the grammar rules handle spacing and Capitalization.`
               </div>
             </>
           )}
-          {activePanel === 'write' && null}
-        </div>
-        <div className="sidebar-inner">
           {activePanel === 'review' ? (
             <div role="tabpanel" aria-labelledby="tab-review">
               {issues.length === 0 ? (
-                <div className="group group-padding"><div className="small muted">No issues found.</div></div>
+                <div className="empty-state" role="status" aria-live="polite">
+                  <div className="empty-illustration" aria-hidden>
+                    <svg width="80" height="80" viewBox="0 0 64 64">
+                      <path d="M6 34l22-8 22 8-22 8-22-8z" fill="#C7F2E9"/>
+                      <path d="M28 26l12-10 6 18-18-8z" fill="#15C39A"/>
+                    </svg>
+                  </div>
+                  <div className="empty-title">You got this.</div>
+                  <div className="empty-subtitle">Suggestions will appear here.</div>
+                </div>
               ) : (
                 <div role="list" className="suggestion-list">
                   {issues.slice(0, 3).map((i, idx) => (
@@ -349,9 +362,11 @@ Also, check how the grammar rules handle spacing and Capitalization.`
                   )}
                 </div>
               )}
-              <div className="section">
-                <button className="btn btn-primary" onClick={fixAll}>Fix All</button>
-              </div>
+              {issues.length > 0 && (
+                <div className="section">
+                  <button className="btn btn-primary" onClick={fixAll}>Fix All</button>
+                </div>
+              )}
             </div>
           ) : (
             <div role="tabpanel" aria-labelledby="tab-write">
@@ -419,6 +434,12 @@ Also, check how the grammar rules handle spacing and Capitalization.`
           </div>
         )}
       </aside>
+      {sidebarOpen && (
+        <button className="sidebar-collapse" aria-label="Hide sidebar" onClick={() => setSidebarOpen(false)}>›</button>
+      )}
+      {!sidebarOpen && (
+        <button className="sidebar-expand" aria-label="Show sidebar" onClick={() => setSidebarOpen(true)}>‹</button>
+      )}
       <VoiceModal open={voiceOpen} initial={voice} onClose={() => setVoiceOpen(false)} onApply={(v) => setVoice(v)} />
     </div>
   )

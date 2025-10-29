@@ -10,6 +10,7 @@ export default function App() {
   const [issues, setIssues] = useState<{ index: number; word: string; suggestion: string; type: string }[]>([])
   const [loading, setLoading] = useState(false)
   const [activePanel, setActivePanel] = useState<'review' | 'write'>('review')
+  const [openSuggestionIdx, setOpenSuggestionIdx] = useState<number | null>(null)
   const [voiceOpen, setVoiceOpen] = useState(false)
   const promptRef = useRef<HTMLTextAreaElement | null>(null)
 
@@ -318,16 +319,30 @@ Also, check how the grammar rules handle spacing and Capitalization.`
               {issues.length === 0 ? (
                 <div className="group group-padding"><div className="small muted">No issues found.</div></div>
               ) : (
-                <div role="list">
+                <div role="list" className="suggestion-list">
                   {issues.slice(0, 3).map((i, idx) => (
-                    <SuggestionCard
-                      key={idx}
-                      label={i.type === 'spelling' ? 'Spelling' : 'Grammar'}
-                      text={`Replace \"${i.word}\" with \"${i.suggestion}\"`}
-                      category={i.type === 'spelling' ? 'correctness' : 'clarity'}
-                      onUse={() => fixAll()}
-                      onDismiss={() => setIssues(issues.filter((_, j) => j !== idx))}
-                    />
+                    openSuggestionIdx === idx ? (
+                      <SuggestionCard
+                        key={idx}
+                        label={i.type === 'spelling' ? 'Spelling' : 'Grammar'}
+                        text={`Replace \"${i.word}\" with \"${i.suggestion}\"`}
+                        category={i.type === 'spelling' ? 'correctness' : 'clarity'}
+                        onUse={() => { fixAll(); setOpenSuggestionIdx(null) }}
+                        onDismiss={() => setIssues(issues.filter((_, j) => j !== idx))}
+                      />
+                    ) : (
+                      <div key={idx} className="suggestion-row" role="listitem" onClick={() => setOpenSuggestionIdx(idx)}>
+                        <div className="sugg-inner">
+                          <span className="sugg-icon" aria-hidden>
+                            <span className="sugg-dot" style={{ background: i.type === 'spelling' ? 'rgba(239,68,68,0.15)' : 'rgba(59,130,246,0.15)', color: i.type === 'spelling' ? '#EF4444' : '#3B82F6' }}>●</span>
+                          </span>
+                          <div className="sugg-text">
+                            <div className="sugg-title">{i.type === 'spelling' ? 'Fix spelling' : 'Grammar suggestion'}</div>
+                            <div className="sugg-main">{i.suggestion}</div>
+                          </div>
+                        </div>
+                      </div>
+                    )
                   ))}
                   {issues.length > 3 && (
                     <div className="muted small" style={{ marginTop: 8 }}>{issues.length - 3} more…</div>

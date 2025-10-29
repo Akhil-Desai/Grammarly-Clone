@@ -24,7 +24,7 @@ export default function SuggestionCard({ label, text, category = 'clarity', onUs
         {text}
       </div>
       <div className="card-actions">
-        <button className="btn btn-primary" onClick={onUse}>Use this version</button>
+        <button className="btn btn-primary" onClick={onUse}>Accept</button>
         <button className="btn btn-ghost" onClick={onDismiss}>Dismiss</button>
         <button className="btn btn-ghost" aria-label="More options">⋮</button>
       </div>

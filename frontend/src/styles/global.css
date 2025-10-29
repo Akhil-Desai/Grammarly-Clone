@@ -96,6 +96,17 @@ body {
 .card-header { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-secondary); margin-bottom: 8px; }
 .card-actions { display: flex; gap: 8px; margin-top: 10px; }
 
+/* Collapsed suggestions list */
+.suggestion-list { border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); margin-top: 8px; }
+.suggestion-row { padding: 10px 0; cursor: pointer; }
+.suggestion-row + .suggestion-row { border-top: 1px solid var(--border); }
+.sugg-inner { display: flex; align-items: center; gap: 12px; }
+.sugg-icon { width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; background: transparent; }
+.sugg-dot { width: 22px; height: 22px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; }
+.sugg-text { display: flex; flex-direction: column; }
+.sugg-title { color: var(--text-muted); font-weight: 600; }
+.sugg-main { color: var(--text); font-weight: 700; font-size: 18px; }
+
 /* Buttons */
 .btn { appearance: none; border: 1px solid var(--border); background: #fff; color: var(--text); padding: 8px 12px; border-radius: var(--radius-btn); font-size: 14px; cursor: pointer; }
 .btn:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }

@@ -17,7 +17,8 @@ All colors MUST be HSL.
     --popover: 0 0% 100%;
     --popover-foreground: 240 10% 15%;
 
-    --primary: 262 52% 47%;
+    /* Switch primary to Grammarly-like green */
+    --primary: 142 70% 40%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 240 5% 96%;
@@ -34,7 +35,7 @@ All colors MUST be HSL.
 
     --border: 240 6% 90%;
     --input: 240 6% 90%;
-    --ring: 262 52% 47%;
+    --ring: 142 70% 40%;
 
     --radius: 0.75rem;
     
@@ -42,13 +43,13 @@ All colors MUST be HSL.
     --warning: 38 92% 50%;
     --info: 217 91% 60%;
     
-    --gradient-primary: linear-gradient(135deg, hsl(262 52% 47%) 0%, hsl(280 60% 55%) 100%);
+    --gradient-primary: linear-gradient(135deg, hsl(142 70% 40%) 0%, hsl(158 64% 48%) 100%);
     --gradient-accent: linear-gradient(135deg, hsl(142 76% 36%) 0%, hsl(158 64% 52%) 100%);
     
     --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
     --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
     --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
-    --shadow-primary: 0 8px 16px -4px hsl(262 52% 47% / 0.3);
+    --shadow-primary: 0 8px 16px -4px hsl(142 70% 40% / 0.25);
 
     --radius: 0.75rem;
 
@@ -79,7 +80,7 @@ All colors MUST be HSL.
     --popover: 240 10% 13%;
     --popover-foreground: 0 0% 95%;
 
-    --primary: 262 52% 60%;
+    --primary: 142 70% 45%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 240 4% 16%;
@@ -96,19 +97,19 @@ All colors MUST be HSL.
 
     --border: 240 4% 16%;
     --input: 240 4% 16%;
-    --ring: 262 52% 60%;
+    --ring: 142 70% 45%;
     
     --success: 142 76% 45%;
     --warning: 38 92% 50%;
     --info: 217 91% 60%;
     
-    --gradient-primary: linear-gradient(135deg, hsl(262 52% 60%) 0%, hsl(280 60% 65%) 100%);
+    --gradient-primary: linear-gradient(135deg, hsl(142 70% 45%) 0%, hsl(158 64% 58%) 100%);
     --gradient-accent: linear-gradient(135deg, hsl(142 76% 45%) 0%, hsl(158 64% 58%) 100%);
     
     --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.5);
     --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.5);
     --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.5);
-    --shadow-primary: 0 8px 16px -4px hsl(262 52% 60% / 0.4);
+    --shadow-primary: 0 8px 16px -4px hsl(142 70% 45% / 0.35);
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
     --sidebar-primary: 224.3 76.3% 48%;
@@ -128,4 +129,30 @@ All colors MUST be HSL.
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* Inline underline styles for editor highlights */
+.underline-correctness {
+  text-decoration-line: underline;
+  text-decoration-color: hsl(0 84% 60%);
+  text-decoration-thickness: 3px;
+  text-underline-offset: 3px;
+}
+.underline-clarity {
+  text-decoration-line: underline;
+  text-decoration-color: #3b82f6; /* blue-500 */
+  text-decoration-thickness: 3px;
+  text-underline-offset: 3px;
+}
+.underline-engagement {
+  text-decoration-line: underline;
+  text-decoration-color: #059669; /* emerald-600 */
+  text-decoration-thickness: 3px;
+  text-underline-offset: 3px;
+}
+.underline-delivery {
+  text-decoration-line: underline;
+  text-decoration-color: #8b5cf6; /* violet-500 */
+  text-decoration-thickness: 3px;
+  text-underline-offset: 3px;
 }

@@ -1,0 +1,41 @@
+:root {
+  /* brand */
+  --brand: #15C39A;
+  --brand-hover: #0FA287;
+  --brand-pressed: #0C8C74;
+
+  /* text */
+  --text: #111827;
+  --text-secondary: #4B5563;
+  --text-muted: #6B7280;
+
+  /* surfaces */
+  --bg: #FFFFFF;
+  --surface: #FFFFFF;
+  --surface-muted: #F6F7F9;
+  --border: #E6E8EB;
+
+  /* accents */
+  --acc-correct: #EF4444;
+  --acc-clarity: #3B82F6;
+  --acc-engage: #8B5CF6;
+  --acc-delivery: #F59E0B;
+
+  /* states */
+  --hl-bg: #E9F2FF;
+  --hl-border: #BFD9FF;
+  --underline-crit: #DC2626;
+  --focus: #93C5FD;
+
+  /* radii */
+  --radius-card: 12px;
+  --radius-btn: 8px;
+  --radius-pill: 9999px;
+
+  /* shadows */
+  --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.04);
+
+  /* layout */
+  --sidebar-width: 420px;
+}
+

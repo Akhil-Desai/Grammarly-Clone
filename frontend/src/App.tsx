@@ -1,18 +1,33 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { apiCheck, apiRewrite } from './api'
 import type { VoiceSettings } from './types'
+import TopBar from './components/TopBar'
+import SuggestionCard from './components/SuggestionCard'
+import VoiceModal from './components/VoiceModal'
 
 export default function App() {
   const [text, setText] = useState('Hello Grammarly Clone')
   const [issues, setIssues] = useState<{ index: number; word: string; suggestion: string; type: string }[]>([])
   const [loading, setLoading] = useState(false)
+  const [activePanel, setActivePanel] = useState<'review' | 'write'>('review')
+  const [openSuggestionIdx, setOpenSuggestionIdx] = useState<number | null>(null)
+  const [voiceOpen, setVoiceOpen] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const promptRef = useRef<HTMLTextAreaElement | null>(null)
+
+  function autosizePrompt() {
+    const el = promptRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    const max = 240 // cap growth
+    el.style.height = Math.min(el.scrollHeight, max) + 'px'
+  }
   const [voice, setVoice] = useState<VoiceSettings>({
     formality: 'Neutral',
     tone: 'Neutral',
     profession: 'General',
     language: 'English'
   })
-  const [menuOpen, setMenuOpen] = useState(false)
   const editorRef = useRef<HTMLDivElement | null>(null)
 
   const exampleDoc = `This is a sample document.
@@ -237,142 +252,195 @@ Also, check how the grammar rules handle spacing and Capitalization.`
 
   // Removed separate Fix Grammar AI button; use "Fix All" under Suggestions instead
 
+  function wordCount(input: string) {
+    const words = input.trim().split(/\s+/).filter(Boolean)
+    return words.length
+  }
+
   return (
-    <div style={{ fontFamily: 'Inter, ui-sans-serif, system-ui', padding: 16, paddingRight: 336 }}>
-      <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <button aria-label="Open menu" onClick={() => setMenuOpen(v => !v)}>☰</button>
-          <h1 style={{ margin: 0, fontSize: 20 }}>My Document #1</h1>
-          {menuOpen && (
-            <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: 8, width: 220, border: '1px solid #e5e7eb', borderRadius: 8, background: '#fff', boxShadow: '0 4px 12px rgba(0,0,0,0.08)', zIndex: 50 }}>
-              <div style={{ padding: 8, borderBottom: '1px solid #f3f4f6', fontSize: 12, color: '#6b7280' }}>Menu</div>
-              <button style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 10px', background: 'transparent' }} onClick={() => { setText(''); setMenuOpen(false) }}>Home</button>
-              <button style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 10px', background: 'transparent' }} onClick={() => { setText(exampleDoc); setMenuOpen(false) }}>New Document</button>
-              <button style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 10px', background: 'transparent' }} onClick={() => { window.alert('Grammarly Clone MVP: basic editor, inline checks, simple AI actions.'); setMenuOpen(false) }}>About this MVP</button>
+    <div className="app-shell" style={{ ['--sidebar-width' as any]: sidebarOpen ? '420px' : '0px' }}>
+      <div>
+        <TopBar title="Untitled document" />
+        <div className="editor-wrap">
+          <div className="editor-page">
+            <div
+              ref={editorRef}
+              className="editor"
+              contentEditable
+              role="textbox"
+              aria-multiline
+              onInput={(e) => setText((e.currentTarget as HTMLDivElement).textContent || '')}
+            />
+
+            {/* Floating formatting toolbar + word count (UI only) */}
+            <div className="editor-footer-fixed" aria-hidden>
+              <div className="formatting-toolbar" role="toolbar" aria-label="Formatting">
+                <button className="tool-btn" aria-label="Bold"><strong>B</strong></button>
+                <button className="tool-btn" aria-label="Italic"><em>I</em></button>
+                <button className="tool-btn" aria-label="Underline"><u>U</u></button>
+                <div className="tool-divider" />
+                <button className="tool-btn" aria-label="Heading 1">H1</button>
+                <button className="tool-btn" aria-label="Heading 2">H2</button>
+                <div className="tool-divider" />
+                <button className="tool-btn" aria-label="Bulleted list">•</button>
+                <button className="tool-btn" aria-label="Numbered list">1.</button>
+                <button className="tool-btn" aria-label="Quote">“”</button>
+              </div>
+              <div className="wordcount-chip" aria-label="Word count">{wordCount(text).toLocaleString()} words</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <aside className="sidebar" role="complementary" aria-label={activePanel === 'review' ? 'Review suggestions' : 'Write with generative AI'} aria-hidden={!sidebarOpen}>
+        <div className="sidebar-header">
+          <div className="sidebar-top-tabs" role="tablist">
+            <button className="top-tab" role="tab" aria-selected={activePanel==='review'} data-active={activePanel==='review'} onClick={() => setActivePanel('review')}>Review suggestions</button>
+            <button className="top-tab" role="tab" aria-selected={activePanel==='write'} data-active={activePanel==='write'} onClick={() => setActivePanel('write')}>Write with generative AI</button>
+          </div>
+          {/* collapse control moved to floating handle outside header */}
+          {activePanel === 'write' && null}
+        </div>
+        <div className="sidebar-inner">
+          {activePanel === 'review' && (
+            <>
+              <div className="section-band">
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <h3 className="sidebar-title">Review suggestions</h3>
+                  <span className="count-chip" aria-label={`${issues.length} suggestions`}>{issues.length}</span>
+                </div>
+              </div>
+              <div className="tabs" role="tablist" style={{ marginTop: 12 }}>
+                <button className="tab correct" role="tab" aria-selected="true" data-active="true">Correctness</button>
+                <button className="tab clarity" role="tab">Clarity</button>
+                <button className="tab engage" role="tab">Engagement</button>
+                <button className="tab delivery" role="tab">Delivery</button>
+              </div>
+            </>
+          )}
+          {activePanel === 'review' ? (
+            <div role="tabpanel" aria-labelledby="tab-review">
+              {issues.length === 0 ? (
+                <div className="empty-state" role="status" aria-live="polite">
+                  <div className="empty-illustration" aria-hidden>
+                    <svg width="80" height="80" viewBox="0 0 64 64">
+                      <path d="M6 34l22-8 22 8-22 8-22-8z" fill="#C7F2E9"/>
+                      <path d="M28 26l12-10 6 18-18-8z" fill="#15C39A"/>
+                    </svg>
+                  </div>
+                  <div className="empty-title">You got this.</div>
+                  <div className="empty-subtitle">Suggestions will appear here.</div>
+                </div>
+              ) : (
+                <div role="list" className="suggestion-list">
+                  {issues.slice(0, 3).map((i, idx) => (
+                    openSuggestionIdx === idx ? (
+                      <SuggestionCard
+                        key={idx}
+                        label={i.type === 'spelling' ? 'Spelling' : 'Grammar'}
+                        text={`Replace \"${i.word}\" with \"${i.suggestion}\"`}
+                        category={i.type === 'spelling' ? 'correctness' : 'clarity'}
+                        onUse={() => { fixAll(); setOpenSuggestionIdx(null) }}
+                        onDismiss={() => setIssues(issues.filter((_, j) => j !== idx))}
+                      />
+                    ) : (
+                      <div key={idx} className="suggestion-row" role="listitem" onClick={() => setOpenSuggestionIdx(idx)}>
+                        <div className="sugg-inner">
+                          <span className="sugg-icon" aria-hidden>
+                            <span className="sugg-dot" style={{ background: i.type === 'spelling' ? 'rgba(239,68,68,0.15)' : 'rgba(59,130,246,0.15)', color: i.type === 'spelling' ? '#EF4444' : '#3B82F6' }}>●</span>
+                          </span>
+                          <div className="sugg-text">
+                            <div className="sugg-title">{i.type === 'spelling' ? 'Fix spelling' : 'Grammar suggestion'}</div>
+                            <div className="sugg-main">{i.suggestion}</div>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  ))}
+                  {issues.length > 3 && (
+                    <div className="muted small" style={{ marginTop: 8 }}>{issues.length - 3} more…</div>
+                  )}
+                </div>
+              )}
+              {issues.length > 0 && (
+                <div className="section">
+                  <button className="btn btn-primary" onClick={fixAll}>Fix All</button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div role="tabpanel" aria-labelledby="tab-write">
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: 14 }}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 22, marginBottom: 6 }}>What do you want to do?</div>
+                  <div className="muted" style={{ fontSize: 16 }}>Here are some ideas</div>
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button className="btn-icon" aria-label="Magic ideas">
+                    <svg className="idea-icon" viewBox="0 0 24 24" aria-hidden>
+                      <path d="M12 2l1.8 3.8L18 8l-4.2 2.2L12 14l-1.8-3.8L6 8l4.2-2.2L12 2z" fill="#0FAD8F"/>
+                    </svg>
+                  </button>
+                  <button className="btn-icon" aria-label="Voice" onClick={() => setVoiceOpen(true)}>
+                    <svg className="idea-icon" viewBox="0 0 24 24" aria-hidden>
+                      <path d="M12 3a3 3 0 0 1 3 3v6a3 3 0 1 1-6 0V6a3 3 0 0 1 3-3zm-5 8a5 5 0 1 0 10 0h2a7 7 0 0 1-6 6.93V21h-2v-3.07A7 7 0 0 1 5 11h2z" fill="#111827"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              <div className="ideas-grid">
+                <div className="idea-card" onClick={onImproveWriting}>
+                  <div className="idea-left">
+                    <svg className="idea-icon" viewBox="0 0 24 24" aria-hidden>
+                      <path d="M4 17l6-6 3 3 7-7" stroke="#0FAD8F" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    <span>Improve it</span>
+                  </div>
+                  <span className="idea-chevron">›</span>
+                </div>
+                <div className="idea-card" onClick={onShorten}>
+                  <div className="idea-left">
+                    <svg className="idea-icon" viewBox="0 0 24 24" aria-hidden>
+                      <path d="M10 3l2 4 4 .6-3 3 .7 4.4L10 13l-3.7 2 1-4.4-3-3L8 7.1 10 3z" fill="#111827"/>
+                    </svg>
+                    <span>Identify any gaps</span>
+                  </div>
+                  <span className="idea-chevron">›</span>
+                </div>
+                <div className="idea-card">
+                  <div className="idea-left">
+                    <svg className="idea-icon" viewBox="0 0 24 24" aria-hidden>
+                      <path d="M4 4h7v7H4V4zm9 0h7v7h-7V4zM4 13h7v7H4v-7zm9 0h7v7h-7v-7z" fill="#111827"/>
+                    </svg>
+                    <span>More ideas</span>
+                  </div>
+                  <span className="idea-chevron">›</span>
+                </div>
+              </div>
+
+              {/* Buttons removed per spec to match Grammarly */}
             </div>
           )}
         </div>
-      </header>
-
-      <div style={{ marginTop: 12 }}>
-        <div>
-          <div
-            ref={editorRef}
-            contentEditable
-            role="textbox"
-            aria-multiline
-            onInput={(e) => setText((e.currentTarget as HTMLDivElement).innerText || '')}
-            style={{ width: '95%', height: 360, fontSize: 16, padding: 12, marginTop: 8, overflow: 'auto', border: '1px solid transparent', borderRadius: 8, whiteSpace: 'pre-wrap', outline: '2px solid transparent', boxShadow: 'none' }}
-          />
-        </div>
-
-        <aside
-          style={{
-            position: 'fixed',
-            top: 0,
-            right: 16,
-            width: 320,
-            height: '100vh',
-            border: '1px solid #e5e7eb',
-            borderRadius: 8,
-            padding: 12,
-            overflow: 'auto',
-            background: '#fff',
-            boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
-          }}
-        >
-          <h3 style={{ marginTop: 0, fontSize: 14, color: '#374151' }}>Voice</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
-            <label style={{ fontSize: 12, color: '#374151' }}>
-              Formality
-              <select value={voice.formality} onChange={(e) => setVoice(v => ({ ...v, formality: e.target.value as VoiceSettings['formality'] }))} style={{ display: 'block', width: '100%' }}>
-                <option>Casual</option>
-                <option>Neutral</option>
-                <option>Formal</option>
-              </select>
-            </label>
-            <label style={{ fontSize: 12, color: '#374151' }}>
-              Tone
-              <select value={voice.tone} onChange={(e) => setVoice(v => ({ ...v, tone: e.target.value as VoiceSettings['tone'] }))} style={{ display: 'block', width: '100%' }}>
-                <option>Friendly</option>
-                <option>Neutral</option>
-                <option>Assertive</option>
-              </select>
-            </label>
-            <label style={{ fontSize: 12, color: '#374151' }}>
-              Profession
-              <select value={voice.profession} onChange={(e) => setVoice(v => ({ ...v, profession: e.target.value as VoiceSettings['profession'] }))} style={{ display: 'block', width: '100%' }}>
-                <option>General</option>
-                <option>Student</option>
-                <option>Engineer</option>
-                <option>Marketing</option>
-              </select>
-            </label>
-            <label style={{ fontSize: 12, color: '#374151' }}>
-              Language
-              <select value={voice.language} onChange={(e) => setVoice(v => ({ ...v, language: e.target.value as VoiceSettings['language'] }))} style={{ display: 'block', width: '100%' }}>
-                <option>English</option>
-                <option>Spanish</option>
-              </select>
-            </label>
-          </div>
-
-          <h3 style={{ fontSize: 14, color: '#374151', marginTop: 24 }}>Improve with AI</h3>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 18 }}>
-            <button onClick={onImproveWriting} disabled={loading}>Improve Writing</button>
-            <button onClick={onShorten} disabled={loading}>Make it Shorter</button>
-          </div>
-          <div style={{ marginBottom: 18 }}>
-            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>Custom instruction</div>
+        {activePanel === 'write' && (
+          <div className="sidebar-footer">
             <textarea
-              placeholder="e.g., make it more confident, friendlier, shorter..."
-              onChange={(e) => (e.currentTarget as HTMLTextAreaElement).value}
-              style={{ width: '100%', maxWidth: '100%', height: 64, fontSize: 13, padding: 8, boxSizing: 'border-box', resize: 'none', display: 'block' }}
-              id="ai-instruction"
+              ref={promptRef}
+              className="prompt-box"
+              placeholder="Tell us to..."
+              rows={1}
+              onInput={autosizePrompt}
             />
-            <div style={{ marginTop: 6 }}>
-              <button onClick={() => {
-                const el = document.getElementById('ai-instruction') as HTMLTextAreaElement | null
-                const instruction = (el?.value || '').toLowerCase()
-                let t = text
-                if (instruction.includes('short')) {
-                  t = t.length > 160 ? t.slice(0, 160) + '…' : t
-                }
-                if (instruction.includes('formal')) {
-                  t = t.replace(/\b(can't|won't|don't|isn't|aren't)\b/gi, (m) => ({
-                    "can't": 'cannot', "won't": 'will not', "don't": 'do not', "isn't": 'is not', "aren't": 'are not'
-                  }[m.toLowerCase()] as string))
-                }
-                if (instruction.includes('confident')) {
-                  t = 'Clearly, ' + t
-                }
-                if (instruction.includes('friendly')) {
-                  t = t.replace(/\b(one|the user|the customer)\b/gi, 'you')
-                }
-                setText(t)
-              }}>Apply</button>
-            </div>
           </div>
-
-          <h3 style={{ marginTop: 24, fontSize: 14, color: '#374151' }}>Suggestions</h3>
-          {loading && <div style={{ color: '#6b7280', fontSize: 12 }}>Loading…</div>}
-          <div style={{ marginBottom: 18 }}>
-            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>Issues</div>
-            {issues.length === 0 ? (
-              <div style={{ color: '#6b7280', fontSize: 13 }}>No issues found.</div>
-            ) : (
-              <ul style={{ paddingLeft: 18, margin: 0, color: '#6b7280', fontSize: 14 }}>
-                {issues.map((i, idx) => (
-                  <li key={idx}>{i.type}: "{i.word}" → {i.suggestion}</li>
-                ))}
-              </ul>
-            )}
-            <div style={{ marginTop: 8 }}>
-              <button onClick={fixAll}>Fix All</button>
-            </div>
-          </div>
-        </aside>
-      </div>
+        )}
+      </aside>
+      {sidebarOpen && (
+        <button className="sidebar-collapse" aria-label="Hide sidebar" onClick={() => setSidebarOpen(false)}>›</button>
+      )}
+      {!sidebarOpen && (
+        <button className="sidebar-expand" aria-label="Show sidebar" onClick={() => setSidebarOpen(true)}>‹</button>
+      )}
+      <VoiceModal open={voiceOpen} initial={voice} onClose={() => setVoiceOpen(false)} onApply={(v) => setVoice(v)} />
     </div>
   )
 }

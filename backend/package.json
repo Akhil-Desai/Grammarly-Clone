@@ -1,0 +1,11 @@
+{
+  "name": "writerly-backend",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "express": "^4.18.2",
+    "@google/generative-ai": "latest",
+    "dotenv": "^16.4.5",
+    "cors": "^2.8.5"
+  }
+}

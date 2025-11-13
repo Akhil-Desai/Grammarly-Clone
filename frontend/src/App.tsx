@@ -214,6 +214,17 @@ Also, check how the grammar rules handle spacing and Capitalization.`
     return out
   }
 
+  async function rewriteWithGemini(text: string) {
+    const response = await fetch("http://localhost:5000/api/rewrite", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text })
+    });
+
+    const data = await response.json();
+    return data.output;
+  }
+
   async function onImproveWriting() {
     setLoading(true)
     try {

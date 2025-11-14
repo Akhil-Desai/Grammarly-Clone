@@ -1,0 +1,25 @@
+# Core API framework (Python AI service - optional alongside Node API)
+fastapi
+uvicorn[standard]
+
+# HTTP client and typing
+httpx
+pydantic>=2
+
+# Env management
+python-dotenv
+
+# Background tasks / queue
+celery
+redis
+tenacity
+
+# Optional: faster JSON (if desired)
+orjson
+
+# Optional: LLM provider SDKs (enable as needed)
+openai
+anthropic
+google-generativeai
+
+

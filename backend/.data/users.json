@@ -1,0 +1,15 @@
+{
+  "users": [
+    {
+      "id": "7e6fc2c6-f1bc-4f2f-99fe-cd79860aba8b",
+      "email": "testemail@gmail.com",
+      "passwordHash": "af6f22ae5d25e12a816b93e43a9b944a:7ba1bc17b02dcc0f96cce9e05e6a6410b55b563328047d55af19303e0cc7511c579d11d3404adb405df73350c03a77f67ade2252e770905fa23c8242ab9f4d70",
+      "roles": [
+        "user"
+      ],
+      "tier": "free",
+      "createdAt": "2025-11-14T17:42:50.936Z",
+      "updatedAt": "2025-11-14T17:42:50.937Z"
+    }
+  ]
+}

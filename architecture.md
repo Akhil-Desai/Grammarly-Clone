@@ -1,55 +1,38 @@
-# Grammarly Clone - Backend Architecture
+# Grammarly Clone - Architecture
 
 ## System Overview
 
-A scalable, real-time writing assistant platform supporting 20+ concurrent users with grammar checking, AI-powered rewrites, and document enhancement capabilities.
+This project is a Grammarly‑inspired writing assistant with:
+- Authentication (JWT)
+- Document storage (PostgreSQL, JSONB body)
+- AI rewrite (Gemini)
+- Spell/grammar checking (LanguageTool via Docker)
+
+It is currently optimized for local development (single Node/Express backend + React frontend), with a clear path to scale.
 
 ## Architecture Components
 
-### 1. API Gateway Layer
+### 1. Current Implementation (v0.2)
 
-#### Main API Gateway
-**Technology**: Kong Gateway / AWS API Gateway / Nginx Plus
-**Purpose**: Central entry point for all client requests
-**Responsibilities**:
-- Request routing and load balancing
-- Authentication via JWT/OAuth 2.0
-- Rate limiting (100 req/min per user for AI operations)
-- Request/Response transformation
-- WebSocket connection management for real-time features
-- Input sanitization and validation
-- SSL/TLS termination
-
-**Implementation**:
-```yaml
-Routes:
-- /api/v1/grammar/* → Real-time Grammar Engine
-- /api/v1/ai/* → AI Engine Service
-- /api/v1/documents/* → Document Service
-- /api/v1/users/* → User Service
-- /ws/grammar → WebSocket for real-time checking
-```
+- Frontend (writerly/): React + Vite (port 8080)
+- Backend (backend/): Node + Express (port 5001)
+- Database: PostgreSQL (Docker, exposed on 5433)
+- Grammar Engine: LanguageTool server (Docker, 8010)
+- Make targets: bootstrap, db-up, db-init, lt-up, dev
+- Auth: Custom JWT (HS256), 15-minute expiry
 
 ### 2. Core Services
 
-#### 2.1 Real-time Grammar Engine
-**Technology**: Node.js + WebSocket Server + LanguageTool API
-**Database**: PostgreSQL for rule storage, Redis for caching
-**Purpose**: Instant spelling and grammar checking
+#### 2.1 Grammar Engine (v1)
+**Technology**: LanguageTool Server (Docker) proxied by Express
+**Purpose**: Low-latency spelling/grammar checks while typing
 
-**Implementation Details**:
-- WebSocket server using Socket.io for bi-directional communication
-- Debounced checking (300ms delay after typing stops)
-- Chunked processing for large documents (5000 character segments)
-- Local caching of common errors and corrections
+**Endpoint (backend)**:
+- `POST /api/grammar/check` → proxies to `LT_URL/v2/check` (default http://localhost:8010)
+- Request: `{ text: string, language?: string }`
+- Response (normalized): `{ suggestions: [{ id, from, to, message, ruleId, original, replacements[] }] }`
 
-**API Endpoints**:
-```javascript
-POST /check - Full document check
-WS /stream - Real-time checking stream
-GET /suggestions/{errorId} - Get fix suggestions
-POST /ignore - Add to user's ignore list
-```
+Frontend debounces input (≈500ms), calls this endpoint, and renders highlights. Applying a fix uses the returned `from/to` offsets to splice content reliably (handles multiple identical errors).
 
 #### 2.2 AI Engine Service (Rewrite & Chat)
 **Technology**: Python FastAPI + Celery for async processing
@@ -166,49 +149,18 @@ interface LLMProvider {
 
 ### 5. Storage Layer
 
-#### 5.1 Database Architecture
+#### 5.1 Database (Current)
+**PostgreSQL** (Docker: 5433->5432)
+- Table `users` (id uuid PK, email citext unique via lower(email) index, settings jsonb, created_at)
+- Table `documents` (id uuid PK, user_id FK, content_jsonb jsonb, metadata jsonb, version int, timestamps)
+- Table `voice_profiles` (optional), `grammar_corrections`, `prompt_history`
 
-**PostgreSQL** (Primary Database):
-- User accounts and authentication
-- Document metadata and versions
-- Grammar rules and corrections
-- Analytics and usage tracking
+Schema is in `backend/schema.sql`. Connection pooling via `backend/db/pool.js`.
 
-**MongoDB** (Document Store):
-- Full document content
-- Revision history
-- User preferences and custom dictionaries
-- AI conversation history
-
-**Redis** (Cache & Queue):
-- Session management
-- Real-time grammar check cache
-- AI response cache (TTL: 1 hour)
-- Task queue for async operations
-- WebSocket connection state
-
-#### 5.2 Data Models
-
-**Document Model**:
-```javascript
-{
-  documentId: UUID,
-  userId: UUID,
-  content: String,
-  metadata: {
-    wordCount: Number,
-    lastModified: DateTime,
-    language: String,
-    documentType: String
-  },
-  versions: [{
-    versionId: UUID,
-    content: String,
-    timestamp: DateTime,
-    changeType: String
-  }]
-}
-```
+Indexes:
+- `users_email_lower_unique` on `lower(email)`
+- `documents_user_updated_idx (user_id, updated_at desc)`
+- `documents_content_jsonb_gin` (jsonb_path_ops)
 
 ### 6. Real-time Processing Pipeline
 
@@ -269,33 +221,24 @@ Services:
 - 1x Redis server (2 CPU, 4GB RAM)
 - Load balancer (Nginx/HAProxy)
 
-### 9. API Design
+### 9. API (Current)
 
-#### RESTful Endpoints
+Auth:
+- `POST /api/auth/register`
+- `POST /api/auth/login`
+- `GET /api/auth/me`
 
-**Document Operations**:
-```
-POST   /api/v1/documents           Create document
-GET    /api/v1/documents/{id}      Get document
-PUT    /api/v1/documents/{id}      Update document
-DELETE /api/v1/documents/{id}      Delete document
-GET    /api/v1/documents/{id}/versions  Get versions
-```
+Documents:
+- `POST /api/documents` (create; returns id)
+- `GET /api/documents` (list for current user)
+- `GET /api/documents/:id` (fetch one; owner-only)
+- `PUT /api/documents/:id` (update content_jsonb and optional metadata; bumps version)
 
-**AI Operations**:
-```
-POST   /api/v1/ai/rewrite          Rewrite selection
-POST   /api/v1/ai/suggestions      Get suggestions
-POST   /api/v1/ai/enhance          Enhance writing
-GET    /api/v1/ai/prompts          Get prompt templates
-```
+AI:
+- `POST /api/rewrite` (Gemini)
 
-**Grammar Operations**:
-```
-POST   /api/v1/grammar/check       Check text
-GET    /api/v1/grammar/rules       Get active rules
-PUT    /api/v1/grammar/ignore      Ignore suggestion
-```
+Grammar:
+- `POST /api/grammar/check` (LanguageTool proxy)
 
 ### 10. Monitoring & Observability
 
@@ -372,45 +315,20 @@ PUT    /api/v1/grammar/ignore      Ignore suggestion
 - Add edge caching with Cloudflare Workers
 - Implement federated learning for personalization
 
-## Quick Start Guide
+## Local Development Notes
 
-### Local Development Setup
-```bash
-# Clone repository
-git clone [repo-url]
+Ports:
+- Frontend: 8080
+- Backend: 5001
+- Postgres (Docker): 5433 (mapped to container 5432)
+- LanguageTool: 8010
 
-# Start services with Docker Compose
-docker-compose up -d
-
-# Run migrations
-npm run migrate
-
-# Seed test data
-npm run seed
-
-# Start development servers
-npm run dev
-```
-
-### Environment Variables
-```env
-# API Gateway
-API_PORT=3000
-JWT_SECRET=your-secret-key
-
-# Database
-POSTGRES_URL=postgresql://localhost:5432/grammarly_clone
-MONGODB_URL=mongodb://localhost:27017/documents
-REDIS_URL=redis://localhost:6379
-
-# LLM APIs
-OPENAI_API_KEY=sk-...
-ANTHROPIC_API_KEY=sk-ant-...
-GEMINI_API_KEY=...
-
-# Grammar API
-LANGUAGE_TOOL_URL=https://api.languagetool.org/v2
-```
+Make targets:
+- `make bootstrap` – install deps
+- `make db-up` – start Postgres
+- `make db-init` – apply schema
+- `make lt-up` – start LanguageTool
+- `make dev` – start backend and frontend
 
 ## Architecture Decision Records (ADRs)
 
@@ -428,5 +346,5 @@ LANGUAGE_TOOL_URL=https://api.languagetool.org/v2
 
 ---
 
-*Last Updated: January 2025*
+*Last Updated: November 2025*
 *Version: 1.0.0*

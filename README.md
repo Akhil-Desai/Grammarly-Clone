@@ -1,34 +1,91 @@
-# Grammarly-Clone
+# Grammarly‑Clone
 
-## The Problem Grammarly Solves Really Well
+Full‑stack writing assistant: React editor, Node/Express backend, PostgreSQL storage, AI rewrite (Gemini), and spell/grammar checks (LanguageTool).
 
-Grammarly helps people communicate clearly, correctly, and confidently in written English.
-At its core, it automates the editing and proofreading process.
+## Prerequisites
+- Node 18+ and npm
+- Docker (Desktop or Colima)
+- macOS/Linux recommended
 
-## Grammarly's Customers
+## Quick Start
+```bash
 
-1. Individuals: students, professionals, freelancers, job seekers, and anyone writing in English (emails, essays, resumes, reports).
+# 1) Install deps
+make bootstrap
 
-2. Non-native English speakers: they get the most tangible benefit because Grammarly bridges linguistic gaps and explains errors.
+# 2) Start Postgres and LanguageTool
+make db-up
+make lt-up
 
-3. Businesses / Teams: companies using “Grammarly Business” for customer support, marketing, HR, or internal communications where tone and correctness matter.
+# 3) Initialize database schema
+make db-init
 
-4. Educational institutions: universities and schools that provide Grammarly to students to improve academic writing.
+# 4) Run backend and frontend
+make dev
+```
 
+App URLs:
+- Frontend: http://localhost:8080
+- Backend API: http://localhost:5001
 
-## Has Minimalist Interface
+## Environment Variables
+Create `backend/.env`:
+```env
+AUTH_SECRET=dev-secret-change-me
+GEMINI_API_KEY=your_key_here
+# If not set, backend defaults to http://localhost:8010
+LT_URL=http://localhost:8010
 
-Yes
+# If you prefer to set DB explicitly:
+# DATABASE_URL=postgres://postgres:postgres@localhost:5433/writerly
+```
 
-## Familiar with required infrastructure
+Notes:
+- Postgres runs via Docker and is exposed on port 5433 (container 5432).
+- `make db-init` applies `backend/schema.sql`.
+- The backend automatically reads `backend/.env`.
 
-Yes
+## What’s Implemented
+- Auth: JWT register/login/me
+- Documents: create, list, fetch, autosave updates (content + title)
+- Grammar: debounced checks via LanguageTool; suggestions with offsets; precise “Accept” by offsets
+- AI Rewrite: Gemini proxy endpoint
 
-## Invokes an LLM
+API (auth required unless noted):
+- `POST /api/auth/register` (public)
+- `POST /api/auth/login` (public)
+- `GET /api/auth/me`
+- `POST /api/documents`
+- `GET /api/documents`
+- `GET /api/documents/:id`
+- `PUT /api/documents/:id`
+- `POST /api/grammar/check`
+- `POST /api/rewrite`
 
-Yes, AI Agent operates in parrallel with you while you write
+## Troubleshooting
+- Port in use (5001): kill existing server
+  ```bash
+  lsof -i :5001
+  kill -9 <PID>
+  ```
+- LanguageTool image not found: we use `erikvl87/languagetool:latest`
+  ```bash
+  docker compose pull languagetool
+  make lt-up
+  ```
+- Postgres auth error: ensure URL matches the Docker DB
+  ```
+  DATABASE_URL=postgres://postgres:postgres@localhost:5433/writerly
+  ```
+- Verify LanguageTool:
+  ```bash
+  curl -s "http://localhost:8010/v2/check" \
+    --data-urlencode "language=en-US" \
+    --data-urlencode "text=Thiss is a smple sentence."
+  ```
 
-## Able to Deploy it
-
-Yes
+## Development Notes
+- Frontend dev server proxies `/api` → `http://localhost:5001`
+- Editor autosaves after ~800ms idle and flushes on unload
+- Grammar checks debounce at ~500ms and operate on current editor text
 

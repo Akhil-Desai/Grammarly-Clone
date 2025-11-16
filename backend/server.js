@@ -6,6 +6,8 @@ import { promises as fs } from "fs";
 import path from "path";
 import crypto from "crypto";
 import { fileURLToPath } from "url";
+import { insertUserRow, ensureUserRow } from "./db/userRepo.js";
+import { createDocument, listDocumentsByUser } from "./db/documentRepo.js";
 
 dotenv.config();
 
@@ -127,6 +129,12 @@ app.post("/api/auth/register", async (req, res) => {
     };
     users.push(user);
     await writeUsers(users);
+    // Best-effort: mirror user into Postgres users table
+    try {
+      await insertUserRow({ id: user.id, email: user.email });
+    } catch (e) {
+      console.warn("Postgres user insert failed (continuing):", e?.message || e);
+    }
     const token = signToken({ sub: user.id, email: user.email, roles: user.roles, tier: user.tier });
     return res.status(201).json({
       token,
@@ -190,5 +198,40 @@ app.post("/api/rewrite", authenticate, async (req, res) => {
   }
 });
 
-const PORT = Number(process.env.PORT) || 5000;
+const PORT = Number(process.env.PORT) || 5001;
 app.listen(PORT, () => console.log(`Backend running on http://localhost:${PORT}`));
+
+// Documents routes (DB-backed)
+app.post("/api/documents", authenticate, async (req, res) => {
+  try {
+    const { content, metadata } = req.body || {};
+    if (content === undefined || content === null) {
+      return res.status(400).json({ error: "content is required" });
+    }
+    // Ensure the current user exists in Postgres (handles legacy file-only users)
+    try {
+      await ensureUserRow({ id: req.user.id, email: req.user.email });
+    } catch {}
+    const created = await createDocument({
+      userId: req.user.id,
+      content,
+      metadata: typeof metadata === "object" ? metadata : null,
+    });
+    return res.status(201).json({ document: created });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Failed to create document" });
+  }
+});
+
+app.get("/api/documents", authenticate, async (req, res) => {
+  try {
+    const limit = req.query.limit ? Number(req.query.limit) : 20;
+    const offset = req.query.offset ? Number(req.query.offset) : 0;
+    const docs = await listDocumentsByUser({ userId: req.user.id, limit, offset });
+    return res.json({ documents: docs });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Failed to list documents" });
+  }
+});

@@ -10,6 +10,28 @@
       "tier": "free",
       "createdAt": "2025-11-14T17:42:50.936Z",
       "updatedAt": "2025-11-14T17:42:50.937Z"
+    },
+    {
+      "id": "d6a0aac9-589f-4c3a-a68b-b6f4f8f334c9",
+      "email": "ahthing99@gmail.com",
+      "passwordHash": "bda121fb4898715c1457af9e3a02ea4a:846dffee5d680ba36505f7d05619dbb2f5cf1f2183cfbc25e708517030a438a086a0376268268ce8b5b71bf5fb305811756f9e3e5a1144d6835de51e1cca6d6b",
+      "roles": [
+        "user"
+      ],
+      "tier": "free",
+      "createdAt": "2025-11-16T18:53:06.652Z",
+      "updatedAt": "2025-11-16T18:53:06.653Z"
+    },
+    {
+      "id": "0d972151-f758-439e-ab2b-a4425d0eed86",
+      "email": "me+1763319748@example.com",
+      "passwordHash": "8f1a8a0b2ab8901e61b7837c456cbf56:60fc854b409ef8b039340b2f17109a8a0cb47b7f72463c2f4ecdcb67ce13298d7cefebf157b50b4cffa5f3a83bd83048e9006fe2cc75955a2188a286a05d1b9b",
+      "roles": [
+        "user"
+      ],
+      "tier": "free",
+      "createdAt": "2025-11-16T19:02:28.992Z",
+      "updatedAt": "2025-11-16T19:02:28.993Z"
     }
   ]
 }

@@ -65,6 +65,21 @@ const Editor = ({ content, onChange, onAnalyze, highlights = [] }: EditorProps) 
   const speakingSeconds = Math.max(1, Math.round((words / 130) * 60));
   const readability = 80; // mock value
 
+  // Keep caret at end after React re-renders innerHTML to prevent reversed typing
+  React.useEffect(() => {
+    const el = editorRef.current;
+    if (!el) return;
+    // Only adjust caret if the editor currently has focus; otherwise this can steal focus
+    if (document.activeElement !== el) return;
+    const selection = window.getSelection?.();
+    if (!selection) return;
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    range.collapse(false); // move caret to end
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }, [content, highlights]);
+
   return (
     <div className="flex-1 flex flex-col bg-background overflow-auto">
       <div className="flex-1 py-8 px-4">

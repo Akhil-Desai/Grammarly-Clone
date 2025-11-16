@@ -7,7 +7,7 @@ import path from "path";
 import crypto from "crypto";
 import { fileURLToPath } from "url";
 import { insertUserRow, ensureUserRow } from "./db/userRepo.js";
-import { createDocument, listDocumentsByUser } from "./db/documentRepo.js";
+import { createDocument, listDocumentsByUser, updateDocumentContent } from "./db/documentRepo.js";
 
 dotenv.config();
 
@@ -233,5 +233,48 @@ app.get("/api/documents", authenticate, async (req, res) => {
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Failed to list documents" });
+  }
+});
+
+// Fetch a single document
+app.get("/api/documents/:id", authenticate, async (req, res) => {
+  try {
+    const id = req.params.id;
+    if (!id) return res.status(400).json({ error: "id is required" });
+    // Only allow owner to fetch
+    const { pool } = await import("./db/pool.js");
+    const { rows } = await pool.query(
+      `SELECT id, user_id, content_jsonb, metadata, version, created_at, updated_at
+       FROM documents
+       WHERE id = $1 AND user_id = $2`,
+      [id, req.user.id]
+    );
+    if (rows.length === 0) return res.status(404).json({ error: "Document not found" });
+    return res.json({ document: rows[0] });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Failed to fetch document" });
+  }
+});
+
+// Update document content
+app.put("/api/documents/:id", authenticate, async (req, res) => {
+  try {
+    const id = req.params.id;
+    const { content, metadata } = req.body || {};
+    if (content === undefined || content === null) {
+      return res.status(400).json({ error: "content is required" });
+    }
+    const updated = await updateDocumentContent({
+      id,
+      userId: req.user.id,
+      content,
+      metadata: typeof metadata === "object" ? metadata : undefined,
+    });
+    if (!updated) return res.status(404).json({ error: "Document not found" });
+    return res.json({ document: updated });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Failed to update document" });
   }
 });

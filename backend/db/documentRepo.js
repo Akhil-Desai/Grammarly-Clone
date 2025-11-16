@@ -31,4 +31,28 @@ export async function listDocumentsByUser({ userId, limit = 20, offset = 0 }) {
   return rows;
 }
 
+export async function updateDocumentContent({ id, userId, content, metadata }) {
+  const contentJson =
+    typeof content === "string" ? { text: content } : content || {};
+  const fields = [];
+  const params = [];
+  let idx = 1;
+  fields.push(`content_jsonb = $${idx++}`);
+  params.push(contentJson);
+  if (metadata && typeof metadata === "object") {
+    fields.push(`metadata = $${idx++}`);
+    params.push(metadata);
+  }
+  // Always bump version and updated_at
+  const query = `
+    UPDATE documents
+    SET ${fields.join(", ")}, version = version + 1, updated_at = now()
+    WHERE id = $${idx++} AND user_id = $${idx++}
+    RETURNING id, user_id, version, updated_at
+  `;
+  params.push(id, userId);
+  const { rows } = await pool.query(query, params);
+  return rows[0] || null;
+}
+
 

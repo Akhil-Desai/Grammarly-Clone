@@ -30,11 +30,12 @@ const Home = () => {
         }),
       });
       const text = await res.text();
-      if (!res.ok) {
+      let data: any = null;
+      try { data = text ? JSON.parse(text) : null; } catch {}
+      if (!res.ok || !data?.document?.id) {
         throw new Error(text || "Failed to create document");
       }
-      // For now, navigate to demo editor
-      navigate("/demo");
+      navigate(`/doc/${data.document.id}`);
     } catch (e: any) {
       alert(e?.message || "Failed to create document");
     } finally {
@@ -143,7 +144,7 @@ const Home = () => {
               <h2 className="text-sm font-medium text-muted-foreground mb-3">Your documents</h2>
               <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4">
                 {docs.map((d: any) => (
-                  <Link key={d.id} to="/demo" className="block">
+                  <Link key={d.id} to={`/doc/${d.id}`} className="block">
                     <Card className="hover:shadow transition-shadow h-full">
                       <CardContent className="p-4">
                         <Badge variant="secondary" className="mb-2">Classic</Badge>

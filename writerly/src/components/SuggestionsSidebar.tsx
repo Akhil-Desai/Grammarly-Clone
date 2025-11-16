@@ -12,6 +12,8 @@ interface Suggestion {
   message: string;
   original: string;
   suggestion: string;
+  from?: number;
+  to?: number;
   category?: "Correctness" | "Clarity" | "Engagement" | "Delivery";
   title?: string;
   severity?: "pro" | "standard";

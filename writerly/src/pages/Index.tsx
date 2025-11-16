@@ -14,6 +14,8 @@ interface Suggestion {
   message: string;
   original: string;
   suggestion: string;
+  from?: number;
+  to?: number;
   // New fields for redesigned sidebar/card
   category?: "Correctness" | "Clarity" | "Engagement" | "Delivery";
   title?: string;
@@ -42,6 +44,8 @@ const Index = () => {
   const lastSyncedRef = useRef<string>("");
   const lastSyncedTitleRef = useRef<string>("");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const grammarDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
   const { toast } = useToast();
 
   const analyzText = async () => {
@@ -124,7 +128,16 @@ const Index = () => {
   const handleApplySuggestion = (id: string, replacement: string) => {
     const suggestion = suggestions.find((s) => s.id === id);
     if (suggestion) {
-      setContent(content.replace(suggestion.original, replacement));
+      // Prefer precise apply using offsets to handle multiple identical errors
+      if (typeof suggestion.from === "number" && typeof suggestion.to === "number") {
+        const from = Math.max(0, Math.min(suggestion.from, content.length));
+        const to = Math.max(from, Math.min(suggestion.to, content.length));
+        const next = content.slice(0, from) + replacement + content.slice(to);
+        setContent(next);
+      } else {
+        // Fallback: replace first occurrence (legacy)
+        setContent(content.replace(suggestion.original, replacement));
+      }
       setSuggestions(suggestions.filter((s) => s.id !== id));
       toast({
         title: "Suggestion applied",
@@ -172,6 +185,54 @@ const Index = () => {
     })();
     return () => { cancelled = true; };
   }, [id, authorizedFetch]);
+
+  // Debounced grammar check on content edits
+  useEffect(() => {
+    if (!id) return;
+    if (grammarDebounceRef.current) clearTimeout(grammarDebounceRef.current);
+    grammarDebounceRef.current = setTimeout(async () => {
+      if (abortRef.current) {
+        abortRef.current.abort();
+      }
+      abortRef.current = new AbortController();
+      setIsAnalyzing(true);
+      try {
+        const res = await authorizedFetch("/api/grammar/check", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: content, language: "en-US" }),
+          signal: abortRef.current.signal as any,
+        } as any);
+        const text = await res.text();
+        let data: any = null;
+        try { data = text ? JSON.parse(text) : null; } catch {}
+        if (!res.ok) {
+          throw new Error(data?.error || text || "Failed to check grammar");
+        }
+        const suggs = Array.isArray(data?.suggestions) ? data.suggestions : [];
+        // Map to UI suggestion objects
+        const mapped = suggs.map((s: any, i: number) => ({
+          id: String(i),
+          type: s.category === "spelling" ? "spelling" : "grammar",
+          message: s.message || "",
+          original: s.original || "",
+          suggestion: (s.replacements && s.replacements[0]) || "",
+          from: typeof s.from === "number" ? s.from : undefined,
+          to: typeof s.to === "number" ? s.to : undefined,
+          category: "Correctness",
+        }));
+        setSuggestions(mapped);
+      } catch (e) {
+        // swallow errors in v1
+      } finally {
+        setIsAnalyzing(false);
+      }
+    }, 500);
+    return () => {
+      if (grammarDebounceRef.current) clearTimeout(grammarDebounceRef.current);
+      if (abortRef.current) abortRef.current.abort();
+    };
+  }, [id, content, authorizedFetch]);
 
   // Debounced autosave when content changes (only for /doc/:id)
   useEffect(() => {

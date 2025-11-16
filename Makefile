@@ -1,4 +1,4 @@
-.PHONY: bootstrap db-up db-down db-init dev
+.PHONY: bootstrap db-up db-down db-init lt-up dev
 
 bootstrap:
 	@echo "Installing dependencies..."
@@ -16,6 +16,10 @@ db-down:
 db-init:
 	@echo "Applying database schema..."
 	cd backend && DATABASE_URL=postgres://postgres:postgres@localhost:5433/writerly node db/init.js
+
+lt-up:
+	@echo "Starting LanguageTool (Docker)..."
+	docker compose up -d languagetool
 
 dev:
 	@echo "Starting backend and frontend..."

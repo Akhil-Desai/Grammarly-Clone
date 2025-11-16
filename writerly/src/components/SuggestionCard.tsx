@@ -10,6 +10,8 @@ interface Suggestion {
   message: string;
   original: string;
   suggestion: string;
+  from?: number;
+  to?: number;
   category?: "Correctness" | "Clarity" | "Engagement" | "Delivery";
   title?: string;
   severity?: "pro" | "standard";
@@ -72,7 +74,7 @@ const SuggestionCard = ({ suggestion, onApply, onDismiss, expanded = false, onTo
                 {suggestion.previewAfter}
               </>
             ) : (
-              suggestion.message
+              (suggestion.original || suggestion.message)
             )}
           </p>
         )}

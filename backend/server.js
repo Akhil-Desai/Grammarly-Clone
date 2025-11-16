@@ -198,6 +198,60 @@ app.post("/api/rewrite", authenticate, async (req, res) => {
   }
 });
 
+// Grammar check (LanguageTool proxy)
+app.post("/api/grammar/check", authenticate, async (req, res) => {
+  try {
+    const { text, language } = req.body || {};
+    if (!text || typeof text !== "string") {
+      return res.status(400).json({ error: "text is required" });
+    }
+    const LT_URL = process.env.LT_URL || "http://localhost:8010";
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 1500);
+    const params = new URLSearchParams();
+    params.set("text", text);
+    params.set("language", typeof language === "string" ? language : "en-US");
+    const ltResp = await fetch(`${LT_URL}/v2/check`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: params,
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    const ltText = await ltResp.text();
+    let ltData = null;
+    try { ltData = ltText ? JSON.parse(ltText) : null; } catch {}
+    if (!ltResp.ok) {
+      const message = ltData?.message || ltText || "LanguageTool error";
+      return res.status(502).json({ error: message });
+    }
+    const matches = Array.isArray(ltData?.matches) ? ltData.matches : [];
+    const suggestions = matches.map((m, idx) => {
+      const offset = m?.offset ?? 0;
+      const length = m?.length ?? 0;
+      const original = text.slice(offset, offset + length);
+      const replacements = Array.isArray(m?.replacements) ? m.replacements.map(r => r?.value).filter(Boolean) : [];
+      return {
+        id: String(m?.rule?.id || idx),
+        from: offset,
+        to: offset + length,
+        message: m?.message || "",
+        ruleId: m?.rule?.id || "",
+        original,
+        replacements,
+        category: (m?.rule?.category?.id || "").toLowerCase().includes("spelling") ? "spelling" : "grammar",
+      };
+    });
+    return res.json({ suggestions });
+  } catch (err) {
+    if (err?.name === "AbortError") {
+      return res.status(504).json({ error: "Grammar check timed out" });
+    }
+    console.error(err);
+    return res.status(500).json({ error: "Grammar check failed" });
+  }
+});
+
 const PORT = Number(process.env.PORT) || 5001;
 app.listen(PORT, () => console.log(`Backend running on http://localhost:${PORT}`));
 

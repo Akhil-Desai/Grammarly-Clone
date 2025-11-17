@@ -32,6 +32,17 @@
       "tier": "free",
       "createdAt": "2025-11-16T19:02:28.992Z",
       "updatedAt": "2025-11-16T19:02:28.993Z"
+    },
+    {
+      "id": "d9f38514-55cd-47ce-88ac-abac58fe354f",
+      "email": "liuyx699@gmail.com",
+      "passwordHash": "aeec4dd9110832aedf0ce78ab74cfee4:10af504d919131ee5b80d0a879530cbfc2947cb31359b7f76d7b49798f5d506882a9ed5d06af69b7cd51c11e9eaa161d5cd413d4945b4e1d3bc538da305c661c",
+      "roles": [
+        "user"
+      ],
+      "tier": "free",
+      "createdAt": "2025-11-17T15:53:39.762Z",
+      "updatedAt": "2025-11-17T15:53:39.762Z"
     }
   ]
 }

@@ -1,62 +1,73 @@
 import { useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Input } from "@/components/ui/input";
+import { useNavigate } from "react-router-dom";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { useAuth } from "@/hooks/use-auth";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { FileText } from "lucide-react";
 
-const Login = () => {
-  const { login } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation() as any;
+import { useAuth } from "@/hooks/use-auth";   // ← 必须加这一行！！！
+
+export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const navigate = useNavigate();
+  const { login } = useAuth();   // ← 从 AuthProvider 读取 login 方法
+
+  const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setError(null);
-    try {
-      await login(email, password);
-      const dest = location.state?.from?.pathname || "/";
-      navigate(dest, { replace: true });
-    } catch (err: any) {
-      setError(err?.message || "Login failed");
-    } finally {
-      setLoading(false);
-    }
+
+    // 模拟登录
+    setTimeout(() => {
+      login("fake-token-123"); // ← 正确调用
+      navigate("/");
+    }, 1000);
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background text-foreground px-4">
-      <Card className="w-full max-w-sm">
-        <CardContent className="p-6">
-          <h1 className="text-lg font-semibold mb-6">Sign in to writerly</h1>
-          <form className="space-y-4" onSubmit={handleSubmit}>
-            <div>
-              <label className="text-sm mb-1 block">Email</label>
-              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+      <div className="min-h-screen flex items-center justify-center p-4 bg-gray-50">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <div className="flex justify-center mb-4">
+              <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+                <FileText className="w-6 h-6 text-white" />
+              </div>
             </div>
-            <div>
-              <label className="text-sm mb-1 block">Password</label>
-              <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-            </div>
-            {error && <div className="text-sm text-red-600">{error}</div>}
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Signing in..." : "Sign in"}
-            </Button>
-          </form>
-          <div className="text-sm text-muted-foreground mt-4">
-            Don&apos;t have an account? <Link to="/signup" className="text-primary">Sign up</Link>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+            <CardTitle className="text-center text-2xl">Welcome to Writerly</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <Input
+                    id="password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                />
+              </div>
+
+              <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700" disabled={loading}>
+                {loading ? "Logging in..." : "Log in"}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
   );
-};
-
-export default Login;
-
-
+}

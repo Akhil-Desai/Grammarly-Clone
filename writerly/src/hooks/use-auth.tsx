@@ -1,139 +1,90 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import React, { createContext, useContext, useEffect, useState } from "react";
 
-type User = {
+interface SimpleUser {
   id: string;
   email: string;
-  roles?: string[];
-  tier?: string;
-};
+}
 
-type AuthContextValue = {
-  user: User | null;
-  token: string | null;
+interface AuthContextType {
   isAuthenticated: boolean;
   initializing: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  signup: (email: string, password: string) => Promise<void>;
+  user: SimpleUser | null;
+  login: (token: string) => void;
   logout: () => void;
-  authorizedFetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
-};
+  authorizedFetch: (url: string, options?: RequestInit) => Promise<Response>;
+}
 
-const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+const AuthContext = createContext<AuthContextType | null>(null);
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem("auth_token"));
-  const [user, setUser] = useState<User | null>(null);
-  const [initializing, setInitializing] = useState(true);
+export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [initializing, setInitializing] = useState<boolean>(true);
+  const [user, setUser] = useState<SimpleUser | null>(null);
 
-  const saveToken = useCallback((t: string | null) => {
-    if (t) {
-      localStorage.setItem("auth_token", t);
-    } else {
-      localStorage.removeItem("auth_token");
-    }
-    setToken(t);
-  }, []);
-
-  const fetchMe = useCallback(async (t: string) => {
-    const res = await fetch("/api/auth/me", {
-      headers: { Authorization: `Bearer ${t}` },
-    });
-    if (!res.ok) throw new Error("Unauthorized");
-    const data = await res.json();
-    setUser(data.user);
-  }, []);
-
+  // Load token on start
   useEffect(() => {
-    (async () => {
-      if (!token) {
-        setInitializing(false);
-        return;
-      }
-      try {
-        await fetchMe(token);
-      } catch {
-        saveToken(null);
-        setUser(null);
-      } finally {
-        setInitializing(false);
-      }
-    })();
-  }, [token, fetchMe, saveToken]);
+    const token = localStorage.getItem("token");
+    const savedUser = localStorage.getItem("user");
 
-  const login = useCallback(async (email: string, password: string) => {
-    const res = await fetch("/api/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
-    });
-    const text = await res.text();
-    let data: any = null;
-    try { data = text ? JSON.parse(text) : null; } catch {}
-    if (!res.ok) {
-      const message = data?.error || text || "Login failed";
-      throw new Error(message);
+    if (token) {
+      setIsAuthenticated(true);
+      if (savedUser) setUser(JSON.parse(savedUser));
     }
-    saveToken(data?.token);
-    setUser(data?.user);
-  }, [saveToken]);
 
-  const signup = useCallback(async (email: string, password: string) => {
-    const res = await fetch("/api/auth/register", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
-    });
-    const text = await res.text();
-    let data: any = null;
-    try { data = text ? JSON.parse(text) : null; } catch {}
-    if (!res.ok) {
-      const message = data?.error || text || "Signup failed";
-      throw new Error(message);
-    }
-    saveToken(data?.token);
-    setUser(data?.user);
-  }, [saveToken]);
+    setInitializing(false);
+  }, []);
 
-  const logout = useCallback(() => {
-    saveToken(null);
+  // Called on login
+  const login = (token: string): void => {
+    localStorage.setItem("token", token);
+
+    // mock user (you can replace with API)
+    const mockUser = { id: "1", email: "user@example.com" };
+    localStorage.setItem("user", JSON.stringify(mockUser));
+
+    setUser(mockUser);
+    setIsAuthenticated(true);
+  };
+
+  // Called on logout
+  const logout = (): void => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
     setUser(null);
-  }, [saveToken]);
+    setIsAuthenticated(false);
+  };
 
-  const authorizedFetch = useCallback(
-    async (input: RequestInfo | URL, init?: RequestInit) => {
-      const headers: Record<string, string> = { ...(init?.headers as any) };
-      if (token) headers.Authorization = `Bearer ${token}`;
-      const res = await fetch(input, { ...init, headers });
-      if (res.status === 401) {
-        // token invalid -> logout
-        logout();
-      }
-      return res;
-    },
-    [token, logout]
+  const authorizedFetch = (url: string, options: RequestInit = {}): Promise<Response> => {
+    const token = localStorage.getItem("token");
+
+    return fetch(url, {
+      ...options,
+      headers: {
+        ...(options.headers || {}),
+        Authorization: token ? `Bearer ${token}` : "",
+        "Content-Type": "application/json",
+      },
+    });
+  };
+
+  return (
+      <AuthContext.Provider
+          value={{
+            isAuthenticated,
+            initializing,
+            user,
+            login,
+            logout,
+            authorizedFetch,
+          }}
+      >
+        {children}
+      </AuthContext.Provider>
   );
-
-  const value = useMemo<AuthContextValue>(
-    () => ({
-      user,
-      token,
-      isAuthenticated: !!user && !!token,
-      initializing,
-      login,
-      signup,
-      logout,
-      authorizedFetch,
-    }),
-    [user, token, initializing, login, signup, logout, authorizedFetch]
-  );
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
-export function useAuth() {
+export const useAuth = (): AuthContextType => {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error("useAuth must be used within AuthProvider");
   return ctx;
-}
-
-
+};

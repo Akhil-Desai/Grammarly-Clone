@@ -81,7 +81,7 @@ const Editor = ({ content, onChange, onAnalyze, highlights = [] }: EditorProps) 
   }, [content, highlights]);
 
   return (
-    <div className="flex-1 flex flex-col bg-background overflow-auto">
+    <div className="flex-1 flex flex-col bg-white dark:bg-gray-900 overflow-auto">
       <div className="flex-1 py-8 px-4">
         <div className="mx-auto max-w-3xl p-8">
           <div
@@ -97,7 +97,7 @@ const Editor = ({ content, onChange, onAnalyze, highlights = [] }: EditorProps) 
         </div>
       </div>
 
-      <div className="p-3 bg-background">
+      <div className="p-3 bg-white dark:bg-gray-900">
         <div className="flex items-center justify-center gap-6">
           <div className="flex items-center gap-4">
             <button className="font-bold" onClick={() => applyFormat("bold")}>B</button>

@@ -8,6 +8,7 @@ import ToneAnalysisModal from "@/components/ToneAnalysisModal";
 import GoalsDialog from "@/components/GoalsDialog";
 import { useToast } from "@/hooks/use-toast";
 
+
 interface Suggestion {
   id: string;
   type: "grammar" | "spelling" | "clarity" | "style";

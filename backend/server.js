@@ -8,6 +8,7 @@ import crypto from "crypto";
 import { fileURLToPath } from "url";
 import { insertUserRow, ensureUserRow } from "./db/userRepo.js";
 import { createDocument, listDocumentsByUser, updateDocumentContent } from "./db/documentRepo.js";
+import { generateAI } from "./ai/index.js";
 
 dotenv.config();
 
@@ -180,6 +181,7 @@ app.get("/api/auth/me", async (req, res) => {
 
 // Existing AI route (now protected)
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+console.log('gemini key present:', genAI);
 
 app.post("/api/rewrite", authenticate, async (req, res) => {
   try {
@@ -249,6 +251,27 @@ app.post("/api/grammar/check", authenticate, async (req, res) => {
     }
     console.error(err);
     return res.status(500).json({ error: "Grammar check failed" });
+  }
+});
+
+// Generic AI generation (non-streaming v1)
+app.post("/api/ai/generate", authenticate, async (req, res) => {
+  try {
+    const { text, task, settings, options, provider } = req.body || {};
+    if (!text || typeof text !== "string") {
+      return res.status(400).json({ error: "text is required" });
+    }
+    const result = await generateAI({
+      task: typeof task === "string" ? task : "freeform",
+      text,
+      settings: typeof settings === "object" && settings ? settings : {},
+      options: typeof options === "object" && options ? options : {},
+      provider: typeof provider === "string" ? provider : undefined,
+    });
+    return res.json({ text: result.output, meta: { provider: result.provider } });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "AI generation failed" });
   }
 });
 

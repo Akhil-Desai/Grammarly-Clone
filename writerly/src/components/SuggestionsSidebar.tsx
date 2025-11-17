@@ -5,6 +5,7 @@ import { Loader2, Lightbulb, Sparkles, Shield, FileCheck, Star, MoreHorizontal, 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useState } from "react";
+import { useAuth } from "@/hooks/use-auth";
 
 interface Suggestion {
   id: string;
@@ -38,6 +39,7 @@ const SuggestionsSidebar = ({
   onDismiss,
   onInsertAi,
 }: SuggestionsSidebarProps) => {
+  const { authorizedFetch } = useAuth();
   const categories = ["All", "Correctness", "Clarity", "Engagement", "Delivery"] as const;
 
   const [activeTab, setActiveTab] = useState("suggestions");
@@ -65,13 +67,30 @@ const SuggestionsSidebar = ({
 
   const mockResponse = `Subject: Request to Discuss Project Deadline\n\nHi Sarah,\n\nI hope this message finds you well. I wanted to discuss the project deadline with you. The team is working really hard; however, we've encountered some unexpected issues, and we may need additional time.\n\nI have written the report, and I believe it’s in good shape. However, I want to ensure everything is perfect before we submit it. Could we schedule a meeting to discuss this further?\n\nI look forward to hearing from you.\n\nBest regards,\nJohn`;
 
-  const triggerAi = (prompt?: string) => {
+  const triggerAi = async (prompt?: string) => {
+    const p = (prompt ?? aiPrompt).trim();
+    if (!p) return;
     if (prompt) setAiPrompt(prompt);
     setIsGeneratingAi(true);
-    setTimeout(() => {
+    try {
+      const res = await authorizedFetch("/api/ai/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: p, task: "freeform" }),
+      });
+      const text = await res.text();
+      let data: any = null;
+      try { data = text ? JSON.parse(text) : null; } catch {}
+      if (!res.ok) {
+        throw new Error(data?.error || text || "AI generation failed");
+      }
+      setAiResponse(typeof data?.text === "string" ? data.text : mockResponse);
+    } catch {
+      // fallback to mock in v1
       setAiResponse(mockResponse);
+    } finally {
       setIsGeneratingAi(false);
-    }, 800);
+    }
   };
 
   const onPromptKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {

@@ -27,4 +27,12 @@ dev:
 	cd writerly && npm run dev & \
 	wait
 
+ai-up:
+	@echo "Starting Ollama (Docker)..."
+	docker compose up -d ollama
+
+ai-pull:
+	@echo "Pulling default local model (llama3.2:3b) into Ollama..."
+	docker exec -it writerly-ollama ollama pull llama3.2:3b
+
 

@@ -15,8 +15,18 @@ services:
     container_name: writerly-languagetool
     ports:
       - "8010:8010"
+  ollama:
+    image: ollama/ollama:latest
+    container_name: writerly-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_KEEP_ALIVE=5m
 
 volumes:
   pgdata:
+  ollama_data:
 
 

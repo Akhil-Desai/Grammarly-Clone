@@ -19,8 +19,28 @@ interface EditorProps {
 const Editor = ({ content, onChange, onAnalyze, highlights = [] }: EditorProps) => {
   const editorRef = React.useRef<HTMLDivElement>(null);
   const handleInput = (e: React.FormEvent<HTMLDivElement>) => {
-    const text = (e.currentTarget as HTMLDivElement).textContent || "";
+    // Use innerText so <br> and block boundaries become newline characters.
+    const text = (e.currentTarget as HTMLDivElement).innerText || "";
     onChange(text);
+  };
+
+  const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const plain = e.clipboardData?.getData("text/plain") || "";
+    const normalized = plain.replace(/\r\n?/g, "\n");
+    // If editor is empty, set content directly so line breaks render correctly
+    const isEmpty = (editorRef.current?.textContent || "").length === 0;
+    if (isEmpty) {
+      onChange(normalized);
+      return;
+    }
+    // Insert as plain text at the caret
+    document.execCommand("insertText", false, normalized);
+    // Sync state after DOM updates
+    setTimeout(() => {
+      const next = editorRef.current?.textContent || "";
+      onChange(next);
+    }, 0);
   };
 
   const applyFormat = (command: "bold" | "italic" | "underline") => {
@@ -65,7 +85,7 @@ const Editor = ({ content, onChange, onAnalyze, highlights = [] }: EditorProps) 
   const speakingSeconds = Math.max(1, Math.round((words / 130) * 60));
   const readability = 80; // mock value
 
-  // Keep caret at end after React re-renders innerHTML to prevent reversed typing
+  // Keep caret at end only when highlights update (avoid forcing during typing)
   React.useEffect(() => {
     const el = editorRef.current;
     if (!el) return;
@@ -78,7 +98,7 @@ const Editor = ({ content, onChange, onAnalyze, highlights = [] }: EditorProps) 
     range.collapse(false); // move caret to end
     selection.removeAllRanges();
     selection.addRange(range);
-  }, [content, highlights]);
+  }, [highlights]);
 
   return (
     <div className="flex-1 flex flex-col bg-background overflow-auto">
@@ -89,6 +109,7 @@ const Editor = ({ content, onChange, onAnalyze, highlights = [] }: EditorProps) 
             contentEditable
             suppressContentEditableWarning
             onInput={handleInput}
+          onPaste={handlePaste}
             className="min-h-[520px] text-lg leading-relaxed outline-none"
             ref={editorRef}
             dangerouslySetInnerHTML={renderHtml()}

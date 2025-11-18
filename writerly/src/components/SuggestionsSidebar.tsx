@@ -30,6 +30,9 @@ interface SuggestionsSidebarProps {
   onApply: (id: string, replacement: string) => void;
   onDismiss: (id: string) => void;
   onInsertAi?: (text: string) => void;
+  contextText?: string;
+  onAiSuggestions?: (suggs: Suggestion[]) => void;
+  onApplyAll?: (suggs: Suggestion[]) => void;
 }
 
 const SuggestionsSidebar = ({
@@ -38,6 +41,9 @@ const SuggestionsSidebar = ({
   onApply,
   onDismiss,
   onInsertAi,
+  contextText,
+  onAiSuggestions,
+  onApplyAll,
 }: SuggestionsSidebarProps) => {
   const { authorizedFetch } = useAuth();
   const categories = ["All", "Correctness", "Clarity", "Engagement", "Delivery"] as const;
@@ -64,19 +70,26 @@ const SuggestionsSidebar = ({
   const [aiPrompt, setAiPrompt] = useState("");
   const [aiResponse, setAiResponse] = useState<string | null>(null);
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
+  const [aiBlockSuggestions, setAiBlockSuggestions] = useState<Suggestion[] | null>(null);
+  const [showPresets, setShowPresets] = useState(true);
 
   const mockResponse = `Subject: Request to Discuss Project Deadline\n\nHi Sarah,\n\nI hope this message finds you well. I wanted to discuss the project deadline with you. The team is working really hard; however, we've encountered some unexpected issues, and we may need additional time.\n\nI have written the report, and I believe it’s in good shape. However, I want to ensure everything is perfect before we submit it. Could we schedule a meeting to discuss this further?\n\nI look forward to hearing from you.\n\nBest regards,\nJohn`;
 
   const triggerAi = async (prompt?: string) => {
     const p = (prompt ?? aiPrompt).trim();
     if (!p) return;
-    if (prompt) setAiPrompt(prompt);
+    if (showPresets) setShowPresets(false);
     setIsGeneratingAi(true);
     try {
+      const shouldCompose = !contextText || (contextText.trim().length < 20);
+      const body =
+        shouldCompose
+          ? { instruction: p, task: "rewrite", context: "" }
+          : { instruction: p, task: "suggestions", context: contextText || "" };
       const res = await authorizedFetch("/api/ai/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: p, task: "freeform" }),
+        body: JSON.stringify(body),
       });
       const text = await res.text();
       let data: any = null;
@@ -84,9 +97,37 @@ const SuggestionsSidebar = ({
       if (!res.ok) {
         throw new Error(data?.error || text || "AI generation failed");
       }
-      setAiResponse(typeof data?.text === "string" ? data.text : mockResponse);
+      if (!shouldCompose && Array.isArray(data?.suggestions) && data.suggestions.length > 0) {
+        const mapped = data.suggestions.map((s: any, i: number) => ({
+          id: `ai-${Date.now()}-${i}`,
+          type: s?.category === "Correctness" ? "grammar" : "clarity",
+          message: s?.message || "",
+          original: s?.original || "",
+          suggestion: s?.suggestion || "",
+          from: typeof s?.from === "number" ? s.from : undefined,
+          to: typeof s?.to === "number" ? s.to : undefined,
+          category: s?.category || "Clarity",
+          severity: "standard",
+        }));
+        setAiBlockSuggestions(mapped);
+        onAiSuggestions?.(mapped); // still update global list if parent wants it
+        // Keep user in AI tab to review the block
+        setActiveTab("ai-writing");
+        // Hide raw JSON/text view when suggestions are present
+        setAiResponse(null);
+        return;
+      }
+      // Also show any improved text for optional insert
+      const looksJson =
+        typeof data?.text === "string" &&
+        /^\s*[{[]/.test(data.text) &&
+        /"suggestions"\s*:/.test(data.text);
+      const candidateText = typeof data?.text === "string" ? data.text : null;
+      setAiBlockSuggestions(null);
+      setAiResponse(!looksJson ? candidateText : null);
     } catch {
       // fallback to mock in v1
+      setAiBlockSuggestions(null);
       setAiResponse(mockResponse);
     } finally {
       setIsGeneratingAi(false);
@@ -97,7 +138,10 @@ const SuggestionsSidebar = ({
     if (e.key === "Enter") {
       e.preventDefault();
       if (!aiPrompt.trim()) return;
-      triggerAi();
+      const current = aiPrompt;
+      setAiPrompt("");
+      if (showPresets) setShowPresets(false);
+      triggerAi(current);
     }
   };
 
@@ -208,13 +252,50 @@ const SuggestionsSidebar = ({
               {isGeneratingAi && (
                 <div className="p-4 text-sm text-muted-foreground">Generating…</div>
               )}
+              {aiBlockSuggestions && aiBlockSuggestions.length > 0 && (
+                <div className="border rounded-md m-2">
+                  <div className="p-4 text-foreground/90 text-sm leading-6 space-y-3">
+                    <div className="font-medium">AI Suggestions ({aiBlockSuggestions.length})</div>
+                    <ol className="list-decimal pl-5 space-y-2">
+                      {aiBlockSuggestions.map((s) => (
+                        <li key={s.id} className="space-y-1">
+                          <div className="text-foreground">{s.message}</div>
+                          <div className="text-xs">
+                            <span className="line-through text-muted-foreground mr-1">{s.original}</span>
+                            <span className="font-semibold">{s.suggestion}</span>
+                            {typeof s.from === "number" && typeof s.to === "number" && (
+                              <span className="text-muted-foreground ml-2">[{s.from}-{s.to}]</span>
+                            )}
+                          </div>
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+                  <div className="flex items-center gap-3 border-t p-3">
+                    <Button size="sm" onClick={() => {
+                      if (aiBlockSuggestions) {
+                        onApplyAll?.(aiBlockSuggestions);
+                        setAiBlockSuggestions(null);
+                        setAiResponse(null);
+                      }
+                    }}>
+                      Insert all
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setAiBlockSuggestions(null)}>Clear</Button>
+                  </div>
+                </div>
+              )}
               {aiResponse && (
                 <div className="border rounded-md m-2">
                   <div className="p-4 whitespace-pre-wrap text-foreground/90 text-sm leading-6">
                     {aiResponse}
                   </div>
                   <div className="flex items-center gap-3 border-t p-3">
-                    <Button size="sm" onClick={() => { onInsertAi?.(aiResponse); }}>
+                    <Button size="sm" onClick={() => {
+                      onInsertAi?.(aiResponse);
+                      setAiResponse(null);
+                      setAiPrompt("");
+                    }}>
                       Insert
                     </Button>
                     <Button size="sm" variant="ghost" onClick={() => { setIsGeneratingAi(true); setTimeout(()=>{ setAiResponse(mockResponse); setIsGeneratingAi(false); }, 600); }}>Retry</Button>
@@ -224,20 +305,24 @@ const SuggestionsSidebar = ({
                 </div>
               )}
 
-              <button className="w-full flex items-center gap-3 px-3 py-4 hover:bg-muted/50 rounded-md" onClick={() => triggerAi("Improve it") }>
-                <Sparkles className="w-4 h-4 text-primary" />
-                <span className="text-left">Improve it</span>
-              </button>
-              <div className="border-t" />
-              <button className="w-full flex items-center gap-3 px-3 py-4 hover:bg-muted/50 rounded-md" onClick={() => triggerAi("Identify any gaps") }>
-                <Lightbulb className="w-4 h-4 text-primary" />
-                <span className="text-left">Identify any gaps</span>
-              </button>
-              <div className="border-t" />
-              <button className="w-full flex items-center gap-3 px-3 py-4 hover:bg-muted/50 rounded-md" onClick={() => triggerAi("More ideas") }>
-                <Sparkles className="w-4 h-4 text-primary" />
-                <span className="text-left">More ideas</span>
-              </button>
+              {showPresets && (
+                <>
+                  <button className="w-full flex items-center gap-3 px-3 py-4 hover:bg-muted/50 rounded-md" onClick={() => triggerAi("Improve it") }>
+                    <Sparkles className="w-4 h-4 text-primary" />
+                    <span className="text-left">Improve it</span>
+                  </button>
+                  <div className="border-t" />
+                  <button className="w-full flex items-center gap-3 px-3 py-4 hover:bg-muted/50 rounded-md" onClick={() => triggerAi("Identify any gaps") }>
+                    <Lightbulb className="w-4 h-4 text-primary" />
+                    <span className="text-left">Identify any gaps</span>
+                  </button>
+                  <div className="border-t" />
+                  <button className="w-full flex items-center gap-3 px-3 py-4 hover:bg-muted/50 rounded-md" onClick={() => triggerAi("More ideas") }>
+                    <Sparkles className="w-4 h-4 text-primary" />
+                    <span className="text-left">More ideas</span>
+                  </button>
+                </>
+              )}
             </div>
           </ScrollArea>
 

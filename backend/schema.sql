@@ -35,6 +35,21 @@ CREATE INDEX IF NOT EXISTS documents_user_id_idx
 CREATE INDEX IF NOT EXISTS documents_content_jsonb_gin
   ON documents USING gin (content_jsonb jsonb_path_ops);
 
+-- deleted_documents (soft delete bucket)
+CREATE TABLE IF NOT EXISTS deleted_documents (
+  id uuid PRIMARY KEY,
+  user_id uuid NOT NULL,
+  content_jsonb jsonb NOT NULL,
+  metadata jsonb,
+  version integer NOT NULL,
+  created_at timestamptz NOT NULL,
+  updated_at timestamptz NOT NULL,
+  deleted_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS deleted_documents_user_deleted_idx
+  ON deleted_documents (user_id, deleted_at DESC);
+
 -- voice_profiles
 CREATE TABLE IF NOT EXISTS voice_profiles (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

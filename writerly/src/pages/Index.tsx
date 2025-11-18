@@ -150,6 +150,60 @@ const Index = () => {
     setSuggestions(suggestions.filter((s) => s.id !== id));
   };
 
+  const applySuggestionsBulk = (contentText: string, suggs: any[]) => {
+    if (!Array.isArray(suggs) || suggs.length === 0) return contentText;
+    // First pass: apply all with offsets, descending order to avoid shifting
+    const withOffsets = suggs.filter((s) => typeof s.from === "number" && typeof s.to === "number");
+    withOffsets.sort((a, b) => (b.from as number) - (a.from as number));
+    let next = contentText;
+    for (const s of withOffsets) {
+      const expected = String(s.original || "");
+      const replacement = String(s.suggestion || "");
+      let from = Math.max(0, Math.min(Number(s.from), next.length));
+      let to = Math.max(from, Math.min(Number(s.to), next.length));
+      // Verify the target matches; if not, try to locate nearby
+      const current = next.slice(from, to);
+      if (expected && current !== expected) {
+        const windowRadius = 200;
+        const start = Math.max(0, from - windowRadius);
+        const end = Math.min(next.length, to + windowRadius);
+        const windowText = next.slice(start, end);
+        const idx = windowText.indexOf(expected);
+        if (idx >= 0) {
+          from = start + idx;
+          to = from + expected.length;
+        } else {
+          // As a last resort, skip this suggestion to avoid corrupting text
+          continue;
+        }
+      }
+      next = next.slice(0, from) + replacement + next.slice(to);
+    }
+    // Second pass: those without offsets, best-effort first occurrence replacement
+    const withoutOffsets = suggs.filter((s) => !(typeof s.from === "number" && typeof s.to === "number"));
+    for (const s of withoutOffsets) {
+      if (s?.original && s?.suggestion) {
+        const idx = next.indexOf(String(s.original));
+        if (idx >= 0) {
+          next = next.slice(0, idx) + String(s.suggestion) + next.slice(idx + String(s.original).length);
+        }
+      }
+    }
+    return next;
+  };
+
+  const handleApplyAllAi = (aiSuggs: any[]) => {
+    const next = applySuggestionsBulk(content, aiSuggs);
+    setContent(next);
+    // Remove suggestions that have offsets applied or originals matched
+    const remaining = suggestions.filter((s) => {
+      const match = aiSuggs.find((a: any) => a.original === s.original && a.suggestion === s.suggestion);
+      return !match;
+    });
+    setSuggestions(remaining);
+    toast({ title: "Applied AI suggestions", description: `Inserted ${aiSuggs.length} changes` });
+  };
+
   const score = Math.max(0, 100 - suggestions.length * 3);
 
   useEffect(() => {
@@ -316,7 +370,19 @@ const Index = () => {
           isAnalyzing={isAnalyzing}
           onApply={handleApplySuggestion}
           onDismiss={handleDismissSuggestion}
-          onInsertAi={(text) => { setContent(text); }}
+          onInsertAi={(text) => {
+            setContent(prev => {
+              const base = prev || "";
+              const sep = base.endsWith("\n") || base.length === 0 ? "" : "\n\n";
+              return base + sep + (text || "");
+            });
+          }}
+          contextText={content}
+          onAiSuggestions={(newSuggs) => {
+            // Prepend AI suggestions to make them visible at the top
+            setSuggestions(prev => [...newSuggs, ...prev]);
+          }}
+          onApplyAll={handleApplyAllAi}
         />
       </div>
       <GoalsDialog open={showGoals} onOpenChange={setShowGoals} onAnalyze={analyzeTone} />

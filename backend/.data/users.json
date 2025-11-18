@@ -32,6 +32,28 @@
       "tier": "free",
       "createdAt": "2025-11-16T19:02:28.992Z",
       "updatedAt": "2025-11-16T19:02:28.993Z"
+    },
+    {
+      "id": "e4f59c3b-de93-4179-b7c5-2351d5a96891",
+      "email": "allenhuo@gmail.com",
+      "passwordHash": "92ca88c78b469e9a0db23db8741ca8f6:da019bd1168fc4883b169a84e336fbb13bfc156ac6ec5303481fc5576f2da2feeae0e61f433bd6bcc438c4836e4dd608155fe193042c99f3b01681a5d47224fd",
+      "roles": [
+        "user"
+      ],
+      "tier": "free",
+      "createdAt": "2025-11-18T00:35:40.842Z",
+      "updatedAt": "2025-11-18T00:35:40.842Z"
+    },
+    {
+      "id": "6c38c450-e8eb-448d-ac8a-060ac503ba77",
+      "email": "demo@demo.com",
+      "passwordHash": "cee99cba73934be07f908ca781c0ceb5:986af5025eeb0f5088ca4171e38bb8ea841e1c375cceaa6e7bcfd8381f075a57367d7abf9c277ed3e52dc4ebeb9c4097e80caf4b58b190b2b25fa5fc67a89428",
+      "roles": [
+        "user"
+      ],
+      "tier": "free",
+      "createdAt": "2025-11-18T01:33:22.848Z",
+      "updatedAt": "2025-11-18T01:33:22.848Z"
     }
   ]
 }

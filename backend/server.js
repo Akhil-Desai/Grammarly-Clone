@@ -7,8 +7,9 @@ import path from "path";
 import crypto from "crypto";
 import { fileURLToPath } from "url";
 import { insertUserRow, ensureUserRow } from "./db/userRepo.js";
-import { createDocument, listDocumentsByUser, updateDocumentContent } from "./db/documentRepo.js";
+import { createDocument, listDocumentsByUser, updateDocumentContent, softDeleteDocument, listDeletedDocumentsByUser, restoreDeletedDocument, purgeDeletedDocument } from "./db/documentRepo.js";
 import { generateAI } from "./ai/index.js";
+import { recordMetric, getMetricsSnapshot } from "./metrics.js";
 
 dotenv.config();
 
@@ -181,7 +182,7 @@ app.get("/api/auth/me", async (req, res) => {
 
 // Existing AI route (now protected)
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-console.log('gemini key present:', genAI);
+//console.log('gemini key present:', genAI);
 
 app.post("/api/rewrite", authenticate, async (req, res) => {
   try {
@@ -203,6 +204,7 @@ app.post("/api/rewrite", authenticate, async (req, res) => {
 // Grammar check (LanguageTool proxy)
 app.post("/api/grammar/check", authenticate, async (req, res) => {
   try {
+    const started = Date.now();
     const { text, language } = req.body || {};
     if (!text || typeof text !== "string") {
       return res.status(400).json({ error: "text is required" });
@@ -244,7 +246,10 @@ app.post("/api/grammar/check", authenticate, async (req, res) => {
         category: (m?.rule?.category?.id || "").toLowerCase().includes("spelling") ? "spelling" : "grammar",
       };
     });
-    return res.json({ suggestions });
+    const elapsed = Date.now() - started;
+    recordMetric("grammar", elapsed);
+    res.set("X-Response-Time-ms", String(elapsed));
+    return res.json({ suggestions, meta: { durationMs: elapsed } });
   } catch (err) {
     if (err?.name === "AbortError") {
       return res.status(504).json({ error: "Grammar check timed out" });
@@ -257,22 +262,37 @@ app.post("/api/grammar/check", authenticate, async (req, res) => {
 // Generic AI generation (non-streaming v1)
 app.post("/api/ai/generate", authenticate, async (req, res) => {
   try {
-    const { text, task, settings, options, provider } = req.body || {};
-    if (!text || typeof text !== "string") {
-      return res.status(400).json({ error: "text is required" });
-    }
+    const { text, task, settings, options, provider, instruction, context } = req.body || {};
+    const hasInstruction = (typeof instruction === "string" && instruction.trim().length > 0) || (typeof text === "string" && text.trim().length > 0);
     const result = await generateAI({
-      task: typeof task === "string" ? task : "freeform",
-      text,
+      task: typeof task === "string" ? task : "rewrite",
+      // treat legacy 'text' as instruction
+      instruction: typeof instruction === "string" ? instruction : (typeof text === "string" ? text : ""),
+      context: typeof context === "string" ? context : "",
       settings: typeof settings === "object" && settings ? settings : {},
       options: typeof options === "object" && options ? options : {},
       provider: typeof provider === "string" ? provider : undefined,
     });
-    return res.json({ text: result.output, meta: { provider: result.provider } });
+    const payload = { text: result.output, meta: { provider: result.provider, durationMs: result.durationMs } };
+    if (typeof result?.durationMs === "number") {
+      recordMetric("ai", result.durationMs);
+      if (result?.provider) recordMetric(`ai:${result.provider}`, result.durationMs);
+      res.set("X-Response-Time-ms", String(result.durationMs));
+    }
+    if (Array.isArray(result?.suggestions)) {
+      payload.suggestions = result.suggestions;
+    }
+    return res.json(payload);
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "AI generation failed" });
   }
+});
+
+// Metrics endpoint for responsiveness KPI
+app.get("/api/metrics/responsiveness", authenticate, (req, res) => {
+  const snapshot = getMetricsSnapshot();
+  return res.json({ metrics: snapshot, generatedAt: new Date().toISOString() });
 });
 
 const PORT = Number(process.env.PORT) || 5001;
@@ -353,5 +373,57 @@ app.put("/api/documents/:id", authenticate, async (req, res) => {
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Failed to update document" });
+  }
+});
+
+// Soft delete a document (move to deleted_documents)
+app.delete("/api/documents/:id", authenticate, async (req, res) => {
+  try {
+    const id = req.params.id;
+    const ok = await softDeleteDocument({ id, userId: req.user.id });
+    if (!ok) return res.status(404).json({ error: "Document not found" });
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Failed to delete document" });
+  }
+});
+
+// List deleted documents for current user
+app.get("/api/deleted-documents", authenticate, async (req, res) => {
+  try {
+    const limit = req.query.limit ? Number(req.query.limit) : 20;
+    const offset = req.query.offset ? Number(req.query.offset) : 0;
+    const rows = await listDeletedDocumentsByUser({ userId: req.user.id, limit, offset });
+    return res.json({ documents: rows });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Failed to list deleted documents" });
+  }
+});
+
+// Restore a deleted document
+app.post("/api/deleted-documents/:id/restore", authenticate, async (req, res) => {
+  try {
+    const id = req.params.id;
+    const ok = await restoreDeletedDocument({ id, userId: req.user.id });
+    if (!ok) return res.status(404).json({ error: "Document not found" });
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Failed to restore document" });
+  }
+});
+
+// Permanently delete from trash
+app.delete("/api/deleted-documents/:id", authenticate, async (req, res) => {
+  try {
+    const id = req.params.id;
+    const ok = await purgeDeletedDocument({ id, userId: req.user.id });
+    if (!ok) return res.status(404).json({ error: "Document not found" });
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Failed to purge document" });
   }
 });

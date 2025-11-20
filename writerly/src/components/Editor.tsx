@@ -18,11 +18,67 @@ interface EditorProps {
 
 const Editor = ({ content, onChange, onAnalyze, highlights = [] }: EditorProps) => {
   const editorRef = React.useRef<HTMLDivElement>(null);
+  const caretOffsetRef = React.useRef<number | null>(null);
+  const userTypingRef = React.useRef<boolean>(false);
   const handleInput = (e: React.FormEvent<HTMLDivElement>) => {
     // Use innerText so <br> and block boundaries become newline characters.
     const text = (e.currentTarget as HTMLDivElement).innerText || "";
     onChange(text);
+    // Capture caret after this input so restore uses the new position
+    updateCaretOffset();
+    // Mark that this content change came from user typing to avoid DOM overwrite
+    userTypingRef.current = true;
+    setTimeout(() => { userTypingRef.current = false; }, 0);
   };
+
+  // Track caret position (character offset within innerText)
+  const updateCaretOffset = React.useCallback(() => {
+    const el = editorRef.current;
+    const sel = window.getSelection?.();
+    if (!el || !sel || sel.rangeCount === 0) return;
+    const range = sel.getRangeAt(0);
+    // Build an iterator to compute offset
+    let offset = 0;
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null);
+    let node: Node | null = walker.nextNode();
+    while (node) {
+      if (node === range.startContainer) {
+        offset += range.startOffset;
+        break;
+      }
+      offset += (node.textContent || "").length;
+      node = walker.nextNode();
+    }
+    caretOffsetRef.current = offset;
+  }, []);
+
+  const restoreCaretOffset = React.useCallback(() => {
+    const el = editorRef.current;
+    if (!el) return;
+    // Do not steal focus from other inputs (e.g., document title field)
+    if (document.activeElement !== el) return;
+    const target = caretOffsetRef.current;
+    if (target == null) return;
+    const sel = window.getSelection?.();
+    if (!sel) return;
+    // Walk text nodes to find target offset
+    let remaining = target;
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null);
+    let node: Node | null = walker.nextNode();
+    while (node) {
+      const len = (node.textContent || "").length;
+      if (remaining <= len) {
+        const range = document.createRange();
+        range.setStart(node, Math.max(0, Math.min(remaining, len)));
+        range.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(range);
+        break;
+      }
+      remaining -= len;
+      node = walker.nextNode();
+    }
+  }, []);
 
   const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -42,6 +98,8 @@ const Editor = ({ content, onChange, onAnalyze, highlights = [] }: EditorProps) 
       onChange(next);
     }, 0);
   };
+
+  // No custom Enter handling; allow browser to insert line breaks naturally.
 
   const applyFormat = (command: "bold" | "italic" | "underline") => {
     editorRef.current?.focus();
@@ -74,8 +132,6 @@ const Editor = ({ content, onChange, onAnalyze, highlights = [] }: EditorProps) 
       const re = new RegExp(`(${escapeRegExp(text)})`, "g");
       html = html.replace(re, `<span class=\"${toClass(category)}\">$1</span>`);
     });
-    // Convert newlines to <br>
-    html = html.replace(/\n/g, "<br>");
     return { __html: html } as { __html: string };
   };
 
@@ -85,20 +141,54 @@ const Editor = ({ content, onChange, onAnalyze, highlights = [] }: EditorProps) 
   const speakingSeconds = Math.max(1, Math.round((words / 130) * 60));
   const readability = 80; // mock value
 
-  // Keep caret at end only when highlights update (avoid forcing during typing)
+  // Save caret on key/mouse interactions
   React.useEffect(() => {
     const el = editorRef.current;
     if (!el) return;
-    // Only adjust caret if the editor currently has focus; otherwise this can steal focus
-    if (document.activeElement !== el) return;
-    const selection = window.getSelection?.();
-    if (!selection) return;
-    const range = document.createRange();
-    range.selectNodeContents(el);
-    range.collapse(false); // move caret to end
-    selection.removeAllRanges();
-    selection.addRange(range);
+    const onKeyUp = () => updateCaretOffset();
+    const onMouseUp = () => updateCaretOffset();
+    el.addEventListener("keyup", onKeyUp);
+    el.addEventListener("mouseup", onMouseUp);
+    return () => {
+      el.removeEventListener("keyup", onKeyUp);
+      el.removeEventListener("mouseup", onMouseUp);
+    };
+  }, [updateCaretOffset]);
+
+  // On highlight changes, do not move caret; just keep current offset
+  React.useEffect(() => {
+    // noop - highlights cause re-render; caret restore is handled by content effect
   }, [highlights]);
+
+  // Keep the DOM in sync when content changes from outside (loading/restoring)
+  React.useEffect(() => {
+    const el = editorRef.current;
+    if (!el) return;
+    if (userTypingRef.current) return; // do not clobber while typing
+    // If there are no highlights, set textContent directly (preserves newlines with CSS pre-wrap)
+    if (!highlights || highlights.length === 0) {
+      if ((el.textContent || "") !== (content || "")) {
+        el.textContent = content || "";
+      }
+      return;
+    }
+    // Preserve caret around the rewrite so Enter moves caret to newline
+    updateCaretOffset();
+    el.innerHTML = renderHtml().__html;
+    restoreCaretOffset();
+  }, [content]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Re-apply highlights when the highlight set changes; preserve caret
+  React.useEffect(() => {
+    const el = editorRef.current;
+    if (!el) return;
+    // Only capture caret if the editor currently has focus
+    if (document.activeElement === el) {
+      updateCaretOffset();
+    }
+    el.innerHTML = renderHtml().__html;
+    restoreCaretOffset();
+  }, [highlights]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="flex-1 flex flex-col bg-background overflow-auto">
@@ -109,10 +199,10 @@ const Editor = ({ content, onChange, onAnalyze, highlights = [] }: EditorProps) 
             contentEditable
             suppressContentEditableWarning
             onInput={handleInput}
-          onPaste={handlePaste}
-            className="min-h-[520px] text-lg leading-relaxed outline-none"
+            onPaste={handlePaste}
+            className="min-h-[520px] text-lg leading-relaxed outline-none whitespace-pre-wrap"
             ref={editorRef}
-            dangerouslySetInnerHTML={renderHtml()}
+            // innerHTML is managed via effects to avoid selection resets during typing
             aria-label="Editor"
           />
         </div>

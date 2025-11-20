@@ -307,20 +307,20 @@ const SuggestionsSidebar = ({
 
               {showPresets && (
                 <>
-                  <button className="w-full flex items-center gap-3 px-3 py-4 hover:bg-muted/50 rounded-md" onClick={() => triggerAi("Improve it") }>
-                    <Sparkles className="w-4 h-4 text-primary" />
-                    <span className="text-left">Improve it</span>
-                  </button>
-                  <div className="border-t" />
-                  <button className="w-full flex items-center gap-3 px-3 py-4 hover:bg-muted/50 rounded-md" onClick={() => triggerAi("Identify any gaps") }>
-                    <Lightbulb className="w-4 h-4 text-primary" />
-                    <span className="text-left">Identify any gaps</span>
-                  </button>
-                  <div className="border-t" />
-                  <button className="w-full flex items-center gap-3 px-3 py-4 hover:bg-muted/50 rounded-md" onClick={() => triggerAi("More ideas") }>
-                    <Sparkles className="w-4 h-4 text-primary" />
-                    <span className="text-left">More ideas</span>
-                  </button>
+              <button className="w-full flex items-center gap-3 px-3 py-4 hover:bg-muted/50 rounded-md" onClick={() => triggerAi("Improve it") }>
+                <Sparkles className="w-4 h-4 text-primary" />
+                <span className="text-left">Improve it</span>
+              </button>
+              <div className="border-t" />
+              <button className="w-full flex items-center gap-3 px-3 py-4 hover:bg-muted/50 rounded-md" onClick={() => triggerAi("Identify any gaps") }>
+                <Lightbulb className="w-4 h-4 text-primary" />
+                <span className="text-left">Identify any gaps</span>
+              </button>
+              <div className="border-t" />
+              <button className="w-full flex items-center gap-3 px-3 py-4 hover:bg-muted/50 rounded-md" onClick={() => triggerAi("More ideas") }>
+                <Sparkles className="w-4 h-4 text-primary" />
+                <span className="text-left">More ideas</span>
+              </button>
                 </>
               )}
             </div>

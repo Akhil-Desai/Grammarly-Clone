@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 interface Suggestion {
   id: string;
   type: "grammar" | "spelling" | "clarity" | "style";
+  source?: "ai";
   message: string;
   original: string;
   suggestion: string;
@@ -359,10 +360,18 @@ const Index = () => {
             content={content} 
             onChange={setContent} 
             onAnalyze={analyzText}
-            highlights={suggestions.map(s => ({
-              text: s.original,
-              category: s.category || (s.type === "grammar" ? "Correctness" : s.type === "clarity" ? "Clarity" : s.type === "style" ? "Engagement" : "Delivery")
-            }))}
+            ranges={suggestions
+              .filter(s =>
+                s.source !== "ai" &&
+                typeof s.from === "number" &&
+                typeof s.to === "number" &&
+                (s.to as number) > (s.from as number)
+              )
+              .map(s => ({
+                from: s.from as number,
+                to: s.to as number,
+                category: s.category || (s.type === "grammar" ? "Correctness" : s.type === "clarity" ? "Clarity" : s.type === "style" ? "Engagement" : "Delivery")
+              }))}
           />
         </div>
         <SuggestionsSidebar

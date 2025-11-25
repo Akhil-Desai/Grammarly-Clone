@@ -1,11 +1,13 @@
-// switched to a contenteditable editor for inline highlight mock
 import React from "react";
-import { Button } from "@/components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ChevronUp } from "lucide-react";
 
 interface Highlight {
   text: string;
+  category: "Correctness" | "Clarity" | "Engagement" | "Delivery";
+}
+
+interface RangeHighlight {
+  from: number;
+  to: number;
   category: "Correctness" | "Clarity" | "Engagement" | "Delivery";
 }
 
@@ -14,100 +16,15 @@ interface EditorProps {
   onChange: (content: string) => void;
   onAnalyze: () => void;
   highlights?: Highlight[];
+  ranges?: RangeHighlight[];
 }
 
-const Editor = ({ content, onChange, onAnalyze, highlights = [] }: EditorProps) => {
-  const editorRef = React.useRef<HTMLDivElement>(null);
-  const caretOffsetRef = React.useRef<number | null>(null);
-  const userTypingRef = React.useRef<boolean>(false);
-  const handleInput = (e: React.FormEvent<HTMLDivElement>) => {
-    // Use innerText so <br> and block boundaries become newline characters.
-    const text = (e.currentTarget as HTMLDivElement).innerText || "";
-    onChange(text);
-    // Capture caret after this input so restore uses the new position
-    updateCaretOffset();
-    // Mark that this content change came from user typing to avoid DOM overwrite
-    userTypingRef.current = true;
-    setTimeout(() => { userTypingRef.current = false; }, 0);
-  };
-
-  // Track caret position (character offset within innerText)
-  const updateCaretOffset = React.useCallback(() => {
-    const el = editorRef.current;
-    const sel = window.getSelection?.();
-    if (!el || !sel || sel.rangeCount === 0) return;
-    const range = sel.getRangeAt(0);
-    // Build an iterator to compute offset
-    let offset = 0;
-    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null);
-    let node: Node | null = walker.nextNode();
-    while (node) {
-      if (node === range.startContainer) {
-        offset += range.startOffset;
-        break;
-      }
-      offset += (node.textContent || "").length;
-      node = walker.nextNode();
-    }
-    caretOffsetRef.current = offset;
-  }, []);
-
-  const restoreCaretOffset = React.useCallback(() => {
-    const el = editorRef.current;
-    if (!el) return;
-    // Do not steal focus from other inputs (e.g., document title field)
-    if (document.activeElement !== el) return;
-    const target = caretOffsetRef.current;
-    if (target == null) return;
-    const sel = window.getSelection?.();
-    if (!sel) return;
-    // Walk text nodes to find target offset
-    let remaining = target;
-    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null);
-    let node: Node | null = walker.nextNode();
-    while (node) {
-      const len = (node.textContent || "").length;
-      if (remaining <= len) {
-        const range = document.createRange();
-        range.setStart(node, Math.max(0, Math.min(remaining, len)));
-        range.collapse(true);
-        sel.removeAllRanges();
-        sel.addRange(range);
-        break;
-      }
-      remaining -= len;
-      node = walker.nextNode();
-    }
-  }, []);
-
-  const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    const plain = e.clipboardData?.getData("text/plain") || "";
-    const normalized = plain.replace(/\r\n?/g, "\n");
-    // If editor is empty, set content directly so line breaks render correctly
-    const isEmpty = (editorRef.current?.textContent || "").length === 0;
-    if (isEmpty) {
-      onChange(normalized);
-      return;
-    }
-    // Insert as plain text at the caret
-    document.execCommand("insertText", false, normalized);
-    // Sync state after DOM updates
-    setTimeout(() => {
-      const next = editorRef.current?.textContent || "";
-      onChange(next);
-    }, 0);
-  };
-
-  // No custom Enter handling; allow browser to insert line breaks naturally.
-
-  const applyFormat = (command: "bold" | "italic" | "underline") => {
-    editorRef.current?.focus();
-    document.execCommand(command);
-  };
+const Editor = ({ content, onChange, onAnalyze, highlights = [], ranges = [] }: EditorProps) => {
+  const overlayRef = React.useRef<HTMLDivElement>(null);
+  const textareaRef = React.useRef<HTMLTextAreaElement>(null);
 
   const escapeHtml = (str: string) =>
-    str
+    String(str)
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;");
@@ -123,115 +40,100 @@ const Editor = ({ content, onChange, onAnalyze, highlights = [] }: EditorProps) 
       ? "underline-engagement"
       : "underline-delivery";
 
-  const renderHtml = () => {
-    let html = escapeHtml(content);
-    // Sort by length to reduce overlapping wrap chances
+  // Text-match based highlighting (fallback; used if no ranges provided)
+  const renderHtmlByText = React.useCallback(() => {
+    if (!highlights || highlights.length === 0) {
+      return escapeHtml(content || "");
+    }
+    let html = escapeHtml(content || "");
     const sorted = [...highlights].sort((a, b) => b.text.length - a.text.length);
     sorted.forEach(({ text, category }) => {
       if (!text) return;
       const re = new RegExp(`(${escapeRegExp(text)})`, "g");
-      html = html.replace(re, `<span class=\"${toClass(category)}\">$1</span>`);
+      html = html.replace(re, `<span class="${toClass(category)}">$1</span>`);
     });
-    return { __html: html } as { __html: string };
-  };
+    return html;
+  }, [content, highlights]);
 
-  const words = React.useMemo(() => content.split(/\s+/).filter(Boolean).length, [content]);
-  const chars = content.length;
-  const readingSeconds = Math.max(1, Math.round((words / 200) * 60));
-  const speakingSeconds = Math.max(1, Math.round((words / 130) * 60));
-  const readability = 80; // mock value
-
-  // Save caret on key/mouse interactions
-  React.useEffect(() => {
-    const el = editorRef.current;
-    if (!el) return;
-    const onKeyUp = () => updateCaretOffset();
-    const onMouseUp = () => updateCaretOffset();
-    el.addEventListener("keyup", onKeyUp);
-    el.addEventListener("mouseup", onMouseUp);
-    return () => {
-      el.removeEventListener("keyup", onKeyUp);
-      el.removeEventListener("mouseup", onMouseUp);
-    };
-  }, [updateCaretOffset]);
-
-  // On highlight changes, do not move caret; just keep current offset
-  React.useEffect(() => {
-    // noop - highlights cause re-render; caret restore is handled by content effect
-  }, [highlights]);
-
-  // Keep the DOM in sync when content changes from outside (loading/restoring)
-  React.useEffect(() => {
-    const el = editorRef.current;
-    if (!el) return;
-    if (userTypingRef.current) return; // do not clobber while typing
-    // If there are no highlights, set textContent directly (preserves newlines with CSS pre-wrap)
-    if (!highlights || highlights.length === 0) {
-      if ((el.textContent || "") !== (content || "")) {
-        el.textContent = content || "";
+  // Offset-based highlighting (preferred)
+  const renderHtmlByRanges = React.useCallback(() => {
+    if (!ranges || ranges.length === 0) {
+      return renderHtmlByText();
+    }
+    const normalized = [...ranges]
+      .map(r => ({
+        from: Math.max(0, Math.min(r.from, content.length)),
+        to: Math.max(0, Math.min(r.to, content.length)),
+        category: r.category,
+      }))
+      .filter(r => r.to > r.from)
+      .sort((a, b) => a.from - b.from || a.to - b.to);
+    const parts: Array<{ text: string; cls?: string }> = [];
+    let cursor = 0;
+    for (const r of normalized) {
+      if (r.from > cursor) {
+        parts.push({ text: content.slice(cursor, r.from) });
       }
-      return;
+      parts.push({ text: content.slice(r.from, r.to), cls: toClass(r.category) });
+      cursor = r.to;
     }
-    // Preserve caret around the rewrite so Enter moves caret to newline
-    updateCaretOffset();
-    el.innerHTML = renderHtml().__html;
-    restoreCaretOffset();
-  }, [content]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (cursor < content.length) {
+      parts.push({ text: content.slice(cursor) });
+    }
+    const html = parts
+      .map(p => {
+        const safe = escapeHtml(p.text);
+        return p.cls ? `<span class="${p.cls}">${safe}</span>` : safe;
+      })
+      .join("");
+    return html;
+  }, [content, ranges]);
 
-  // Re-apply highlights when the highlight set changes; preserve caret
-  React.useEffect(() => {
-    const el = editorRef.current;
-    if (!el) return;
-    // Only capture caret if the editor currently has focus
-    if (document.activeElement === el) {
-      updateCaretOffset();
-    }
-    el.innerHTML = renderHtml().__html;
-    restoreCaretOffset();
-  }, [highlights]); // eslint-disable-line react-hooks/exhaustive-deps
+  const highlightedHtml = React.useMemo(() => {
+    // Ensure there is always at least one character so the last newline renders height correctly
+    const html = renderHtmlByRanges();
+    return html === "" ? " " : html;
+  }, [renderHtmlByRanges]);
+
+  const onScroll = () => {
+    const ta = textareaRef.current;
+    const ov = overlayRef.current;
+    if (!ta || !ov) return;
+    ov.scrollTop = ta.scrollTop;
+    ov.scrollLeft = ta.scrollLeft;
+  };
 
   return (
     <div className="flex-1 flex flex-col bg-background overflow-auto">
       <div className="flex-1 py-8 px-4">
         <div className="mx-auto max-w-3xl p-8">
-          <div
-            role="textbox"
-            contentEditable
-            suppressContentEditableWarning
-            onInput={handleInput}
-            onPaste={handlePaste}
-            className="min-h-[520px] text-lg leading-relaxed outline-none whitespace-pre-wrap"
-            ref={editorRef}
-            // innerHTML is managed via effects to avoid selection resets during typing
-            aria-label="Editor"
-          />
-        </div>
-      </div>
-
-      <div className="p-3 bg-background">
-        <div className="flex items-center justify-center gap-6">
-          <div className="flex items-center gap-4">
-            <button className="font-bold" onClick={() => applyFormat("bold")}>B</button>
-            <button className="italic" onClick={() => applyFormat("italic")}>I</button>
-            <button className="underline" onClick={() => applyFormat("underline")}>U</button>
+          <div className="relative">
+            <div
+              aria-hidden="true"
+              ref={overlayRef}
+              className="absolute inset-0 pointer-events-none whitespace-pre-wrap break-words text-lg leading-relaxed text-foreground"
+              style={{
+                padding: "0.5rem 0.75rem",
+                // Match textarea styles exactly for alignment
+                // Tailwind classes applied on textarea below; keep style parity here
+              }}
+              dangerouslySetInnerHTML={{ __html: highlightedHtml }}
+            />
+            <textarea
+              ref={textareaRef}
+              value={content}
+              onChange={(e) => onChange(e.target.value)}
+              onScroll={onScroll}
+              className="min-h-[520px] w-full text-lg leading-relaxed outline-none whitespace-pre-wrap bg-transparent relative"
+              style={{
+                color: "transparent",
+                caretColor: "hsl(var(--foreground))",
+                padding: "0.5rem 0.75rem",
+                // Ensure the same font metrics as overlay (inherits from page)
+              }}
+              aria-label="Editor"
+            />
           </div>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="rounded-md shadow-sm">
-                {words} words
-                <ChevronUp className="ml-2 h-4 w-4" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent align="end" className="w-64 p-0">
-              <div className="p-3 space-y-2">
-                <div className="rounded-md border px-3 py-2 font-semibold">{words} words</div>
-                <div className="px-3 py-1">{chars} characters</div>
-                <div className="px-3 py-1">{readingSeconds} sec reading time</div>
-                <div className="px-3 py-1">{speakingSeconds} sec speaking time</div>
-                <div className="px-3 py-1">{readability} readability score</div>
-              </div>
-            </PopoverContent>
-          </Popover>
         </div>
       </div>
     </div>

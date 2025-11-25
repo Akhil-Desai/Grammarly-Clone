@@ -7,6 +7,7 @@ export type SuggestionType = "grammar" | "spelling" | "clarity" | "style";
 interface Suggestion {
   id: string;
   type: SuggestionType;
+  source?: "ai";
   message: string;
   original: string;
   suggestion: string;
@@ -30,7 +31,7 @@ interface SuggestionCardProps {
 }
 
 const SuggestionCard = ({ suggestion, onApply, onDismiss, expanded = false, onToggle }: SuggestionCardProps) => {
-  const headingLeft = suggestion.category ?? suggestion.type;
+  const headingLeft = suggestion.source === "ai" ? "AI suggestion" : (suggestion.category ?? suggestion.type);
   const title = suggestion.title ?? suggestion.message;
 
   const hasPreviewParts =

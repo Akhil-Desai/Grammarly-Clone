@@ -13,6 +13,7 @@ interface Suggestion {
   message: string;
   original: string;
   suggestion: string;
+  source?: "ai";
   from?: number;
   to?: number;
   category?: "Correctness" | "Clarity" | "Engagement" | "Delivery";
@@ -100,13 +101,14 @@ const SuggestionsSidebar = ({
       if (!shouldCompose && Array.isArray(data?.suggestions) && data.suggestions.length > 0) {
         const mapped = data.suggestions.map((s: any, i: number) => ({
           id: `ai-${Date.now()}-${i}`,
-          type: s?.category === "Correctness" ? "grammar" : "clarity",
+          type: "clarity",
+          source: "ai",
           message: s?.message || "",
           original: s?.original || "",
           suggestion: s?.suggestion || "",
           from: typeof s?.from === "number" ? s.from : undefined,
           to: typeof s?.to === "number" ? s.to : undefined,
-          category: s?.category || "Clarity",
+          // Do not assign normal categories; keep uncategorized
           severity: "standard",
         }));
         setAiBlockSuggestions(mapped);
@@ -307,20 +309,20 @@ const SuggestionsSidebar = ({
 
               {showPresets && (
                 <>
-                  <button className="w-full flex items-center gap-3 px-3 py-4 hover:bg-muted/50 rounded-md" onClick={() => triggerAi("Improve it") }>
-                    <Sparkles className="w-4 h-4 text-primary" />
-                    <span className="text-left">Improve it</span>
-                  </button>
-                  <div className="border-t" />
-                  <button className="w-full flex items-center gap-3 px-3 py-4 hover:bg-muted/50 rounded-md" onClick={() => triggerAi("Identify any gaps") }>
-                    <Lightbulb className="w-4 h-4 text-primary" />
-                    <span className="text-left">Identify any gaps</span>
-                  </button>
-                  <div className="border-t" />
-                  <button className="w-full flex items-center gap-3 px-3 py-4 hover:bg-muted/50 rounded-md" onClick={() => triggerAi("More ideas") }>
-                    <Sparkles className="w-4 h-4 text-primary" />
-                    <span className="text-left">More ideas</span>
-                  </button>
+              <button className="w-full flex items-center gap-3 px-3 py-4 hover:bg-muted/50 rounded-md" onClick={() => triggerAi("Improve it") }>
+                <Sparkles className="w-4 h-4 text-primary" />
+                <span className="text-left">Improve it</span>
+              </button>
+              <div className="border-t" />
+              <button className="w-full flex items-center gap-3 px-3 py-4 hover:bg-muted/50 rounded-md" onClick={() => triggerAi("Identify any gaps") }>
+                <Lightbulb className="w-4 h-4 text-primary" />
+                <span className="text-left">Identify any gaps</span>
+              </button>
+              <div className="border-t" />
+              <button className="w-full flex items-center gap-3 px-3 py-4 hover:bg-muted/50 rounded-md" onClick={() => triggerAi("More ideas") }>
+                <Sparkles className="w-4 h-4 text-primary" />
+                <span className="text-left">More ideas</span>
+              </button>
                 </>
               )}
             </div>

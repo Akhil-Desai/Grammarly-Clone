@@ -6,7 +6,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { Link, useNavigate } from "react-router-dom";
 
 const Trash = () => {
-  const { authorizedFetch } = useAuth();
+  const { authorizedFetch, logout } = useAuth();
   const navigate = useNavigate();
   const [docs, setDocs] = useState<Array<any>>([]);
   const [loading, setLoading] = useState(true);
@@ -51,6 +51,11 @@ const Trash = () => {
     setDocs(prev => prev.filter(d => d.id !== id));
   }
 
+  function handleLogout() {
+    logout();
+    navigate("/login");
+  }
+
   return (
     <div className="min-h-screen bg-background text-foreground flex">
       {/* Sidebar mimic from Home for quick nav */}
@@ -84,6 +89,11 @@ const Trash = () => {
       <main className="flex-1">
         <div className="h-16 flex items-center justify-between px-8 border-b">
           <h1 className="text-2xl font-semibold">Trash</h1>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="ghost" onClick={handleLogout}>
+              Logout
+            </Button>
+          </div>
         </div>
 
         <div className="px-8 py-6">

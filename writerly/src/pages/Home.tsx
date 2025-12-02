@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { FileText, Plus, Upload, Search, Trash2, User } from "lucide-react";
+import { FileText, Plus, Search, Trash2, User } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useEffect, useState } from "react";
 
@@ -16,6 +16,7 @@ const Home = () => {
   const [docs, setDocs] = useState<Array<any>>([]);
   const [loadingDocs, setLoadingDocs] = useState(true);
   const [docsError, setDocsError] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
 
   async function handleCreateDoc() {
     if (creating) return;
@@ -109,9 +110,6 @@ const Home = () => {
             <Button size="sm" onClick={handleCreateDoc} disabled={creating}>
               <Plus className="w-4 h-4 mr-2" /> New doc
             </Button>
-            <Button size="sm" variant="outline">
-              <Upload className="w-4 h-4 mr-2" /> Upload
-            </Button>
             <Button size="sm" variant="ghost" onClick={handleLogout}>
               Logout
             </Button>
@@ -122,7 +120,12 @@ const Home = () => {
           <div className="max-w-xl mb-6">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input placeholder="Search docs" className="pl-9" />
+              <Input
+                placeholder="Search docs"
+                className="pl-9"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
             </div>
           </div>
 
@@ -135,8 +138,17 @@ const Home = () => {
           ) : (
             <>
               <h2 className="text-sm font-medium text-muted-foreground mb-3">Your documents</h2>
-              <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4">
-                {docs.map((d: any) => (
+              {(() => {
+                const q = query.trim().toLowerCase();
+                const filtered = q
+                  ? docs.filter((d: any) => String(d.title || "Untitled doc").toLowerCase().includes(q))
+                  : docs;
+                if (filtered.length === 0) {
+                  return <div className="text-sm text-muted-foreground">No matching documents.</div>;
+                }
+                return (
+                  <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4">
+                {filtered.map((d: any) => (
                   <Link key={d.id} to={`/doc/${d.id}`} className="block">
                     <Card className="hover:shadow transition-shadow h-full">
                       <CardContent className="p-4">
@@ -176,7 +188,9 @@ const Home = () => {
                     </Card>
                   </Link>
                 ))}
-              </div>
+                  </div>
+                );
+              })()}
             </>
           )}
         </div>

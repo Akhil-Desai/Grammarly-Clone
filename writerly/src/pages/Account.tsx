@@ -30,7 +30,7 @@ const Row: React.FC<{
 };
 
 const Account: React.FC = () => {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -48,6 +48,10 @@ const Account: React.FC = () => {
   };
 
   const score = 100; // not used on this page UI, but Header expects a score
+  const handleLogout = () => {
+    logout();
+    navigate("/login");
+  };
 
   return (
     <div className="min-h-screen bg-background text-foreground flex">
@@ -83,6 +87,11 @@ const Account: React.FC = () => {
       <main className="flex-1">
         <div className="h-16 flex items-center justify-between px-8 border-b">
           <h1 className="text-2xl font-semibold">Profile</h1>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="ghost" onClick={handleLogout}>
+              Logout
+            </Button>
+          </div>
         </div>
         <div className="mx-auto max-w-3xl w-full px-6 py-8">
           <div className="bg-card rounded-lg border">

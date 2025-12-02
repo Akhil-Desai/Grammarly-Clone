@@ -31,4 +31,18 @@ export async function ensureUserRow({ id, email }) {
   }
 }
 
+export async function getUserSettings(userId) {
+  const { rows } = await pool.query("SELECT settings FROM users WHERE id = $1", [userId]);
+  if (rows.length === 0) return null;
+  return rows[0]?.settings || null;
+}
+
+export async function updateUserSettings(userId, settings) {
+  const { rows } = await pool.query(
+    "UPDATE users SET settings = $2 WHERE id = $1 RETURNING settings",
+    [userId, settings || null]
+  );
+  return rows[0]?.settings || null;
+}
+
 

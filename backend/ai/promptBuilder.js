@@ -10,12 +10,16 @@ export function buildPrompt({
   // Support a "suggestions" task that asks for structured JSON
   const isSuggestions = task === "suggestions";
   const hasContext = typeof context === "string" && context.trim().length > 0;
-  const toneLine = settings?.tone ? `Tone: ${settings.tone}.` : "";
+  // Prefer nested voice settings if provided; fall back to legacy flat fields if present
+  const voice = (settings && typeof settings === "object" && settings.voice) ? settings.voice : settings;
+  const toneLine = voice?.tone ? `Tone: ${voice.tone}.` : "";
   const formalityLine =
-    settings?.formality !== undefined
-      ? `Formality: ${settings.formality}.`
+    voice?.formality !== undefined
+      ? `Formality: ${voice.formality} (1-5).`
       : "";
-  const languageLine = settings?.language ? `Language: ${settings.language}.` : "";
+  const audienceLine = voice?.audience ? `Audience: ${voice.audience}.` : "";
+  const intentLine = voice?.intent ? `Intent: ${voice.intent}.` : "";
+  const domainLine = voice?.domain ? `Domain: ${voice.domain}.` : "";
 
   const baseGoal =
     task === "summarize"
@@ -48,7 +52,9 @@ export function buildPrompt({
       : "Return only the revised text unless the user asked for bullets or explanation.",
     toneLine,
     formalityLine,
-    languageLine,
+    audienceLine,
+    intentLine,
+    domainLine,
     "",
     "User request:",
     safeInstruction,

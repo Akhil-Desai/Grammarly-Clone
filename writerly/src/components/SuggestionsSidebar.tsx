@@ -1,11 +1,14 @@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import SuggestionCard, { SuggestionType } from "./SuggestionCard";
-import { Loader2, Lightbulb, Sparkles, Shield, FileCheck, Star, MoreHorizontal, Copy } from "lucide-react";
+import { Loader2, Lightbulb, Sparkles, Shield, Star, MoreHorizontal, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Slider } from "@/components/ui/slider";
 
 interface Suggestion {
   id: string;
@@ -170,7 +173,7 @@ const SuggestionsSidebar = ({
             className="flex-1 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent py-3 !whitespace-normal text-left leading-snug break-words px-3"
           >
             <Shield className="w-4 h-4 mr-2" />
-            Check for AI text & plagiarism
+            Voice settings
           </TabsTrigger>
         </TabsList>
 
@@ -340,56 +343,10 @@ const SuggestionsSidebar = ({
 
         <TabsContent value="plagiarism" className="flex-1 flex flex-col mt-0 overflow-hidden min-h-0">
           <div className="p-4 border-b border-border flex-shrink-0">
-            <h2 className="font-semibold text-lg">Check for AI text & plagiarism</h2>
-            <p className="text-sm text-muted-foreground mt-1">Scan your text for originality and AI-likeness</p>
+            <h2 className="font-semibold text-lg">Voice settings</h2>
+            <p className="text-sm text-muted-foreground mt-1">Control tone, formality, audience, intent, and domain for rewrites</p>
           </div>
-
-          <ScrollArea className="flex-1 h-full">
-            <div className="p-4 space-y-4">
-              <div className="bg-muted/50 rounded-lg p-4 space-y-3">
-                <div className="flex items-center gap-3">
-                  <FileCheck className="w-8 h-8 text-primary" />
-                  <div>
-                    <h3 className="font-medium">Ready to scan</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Check your text against billions of web pages
-                    </p>
-                  </div>
-                </div>
-                <Button className="w-full">
-                  <Shield className="w-4 h-4 mr-2" />
-                  Run Plagiarism Check
-                </Button>
-              </div>
-
-              <div className="space-y-3">
-                <h3 className="text-sm font-medium">What we check</h3>
-                <ul className="space-y-2 text-sm text-muted-foreground">
-                  <li className="flex items-start gap-2">
-                    <span className="text-primary mt-1">✓</span>
-                    <span>16+ billion web pages</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-primary mt-1">✓</span>
-                    <span>Academic databases and journals</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-primary mt-1">✓</span>
-                    <span>Published works and books</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-primary mt-1">✓</span>
-                    <span>Previously submitted papers</span>
-                  </li>
-                </ul>
-              </div>
-
-              <div className="border-t pt-4 space-y-2">
-                <h3 className="text-sm font-medium">Recent Scans</h3>
-                <p className="text-xs text-muted-foreground">No recent plagiarism checks</p>
-              </div>
-            </div>
-          </ScrollArea>
+          <VoiceSettingsPanel />
         </TabsContent>
       </Tabs>
       {/* bottom CTA moved inside scroll area to avoid stealing viewport height */}
@@ -398,3 +355,147 @@ const SuggestionsSidebar = ({
 };
 
 export default SuggestionsSidebar;
+
+// ---- Voice Settings Panel (uses /api/user/settings) ----
+const tones = ["formal","neutral","friendly","confident","persuasive","empathetic"] as const;
+const audiences = ["general","expert","executive","peer","customer"] as const;
+const intents = ["inform","explain","persuade","request","apologize","congratulate"] as const;
+const domains = ["general","academic","business","technical","creative","legal","medical"] as const;
+
+function VoiceSettingsPanel() {
+  const { authorizedFetch } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [savedMsg, setSavedMsg] = useState<string | null>(null);
+  const [voice, setVoice] = useState({
+    tone: "neutral",
+    formality: 3,
+    audience: "general",
+    intent: "inform",
+    domain: "general",
+  });
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        setError(null);
+        setSavedMsg(null);
+        const res = await authorizedFetch("/api/user/settings", { method: "GET" });
+        const text = await res.text();
+        let data: any = null;
+        try { data = text ? JSON.parse(text) : null; } catch {}
+        if (!res.ok) throw new Error(data?.error || text || "Failed to load settings");
+        const v = data?.settings?.voice || {};
+        if (mounted) {
+          setVoice({
+            tone: tones.includes(v.tone) ? v.tone : "neutral",
+            formality: Number.isFinite(v.formality) ? Math.max(1, Math.min(5, Math.round(v.formality))) : 3,
+            audience: audiences.includes(v.audience) ? v.audience : "general",
+            intent: intents.includes(v.intent) ? v.intent : "inform",
+            domain: domains.includes(v.domain) ? v.domain : "general",
+          });
+        }
+      } catch (e: any) {
+        if (mounted) setError(e?.message || "Failed to load settings");
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
+  }, [authorizedFetch]);
+
+  const onSave = async () => {
+    setSaving(true);
+    setError(null);
+    setSavedMsg(null);
+    try {
+      const res = await authorizedFetch("/api/user/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ voice }),
+      });
+      const text = await res.text();
+      let data: any = null;
+      try { data = text ? JSON.parse(text) : null; } catch {}
+      if (!res.ok) throw new Error(data?.error || text || "Failed to save settings");
+      setSavedMsg("Saved");
+    } catch (e: any) {
+      setError(e?.message || "Failed to save settings");
+    } finally {
+      setSaving(false);
+      setTimeout(() => setSavedMsg(null), 1500);
+    }
+  };
+
+  return (
+    <ScrollArea className="flex-1 h-full">
+      <div className="p-4 space-y-4">
+        {loading ? (
+          <div className="p-3 text-sm text-muted-foreground">Loading voice settings…</div>
+        ) : (
+          <>
+            {error && <div className="p-2 text-sm text-red-600 border border-red-600/30 rounded">{error}</div>}
+            <div className="grid grid-cols-1 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="tone">Tone</Label>
+                <Select value={voice.tone} onValueChange={(v) => setVoice({ ...voice, tone: v as typeof tones[number] })}>
+                  <SelectTrigger id="tone" className="capitalize"><SelectValue placeholder="Select tone" /></SelectTrigger>
+                  <SelectContent>
+                    {tones.map((t) => (<SelectItem key={t} value={t} className="capitalize">{t}</SelectItem>))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="formality">Formality (1 informal – 5 very formal)</Label>
+                <div className="px-1">
+                  <Slider
+                    id="formality"
+                    min={1}
+                    max={5}
+                    step={1}
+                    value={[voice.formality]}
+                    onValueChange={(v) => setVoice({ ...voice, formality: v?.[0] ?? 3 })}
+                  />
+                  <div className="text-xs text-muted-foreground mt-1">Current: {voice.formality}</div>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="audience">Audience</Label>
+                <Select value={voice.audience} onValueChange={(v) => setVoice({ ...voice, audience: v as typeof audiences[number] })}>
+                  <SelectTrigger id="audience" className="capitalize"><SelectValue placeholder="Select audience" /></SelectTrigger>
+                  <SelectContent>
+                    {audiences.map((a) => (<SelectItem key={a} value={a} className="capitalize">{a}</SelectItem>))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="intent">Intent</Label>
+                <Select value={voice.intent} onValueChange={(v) => setVoice({ ...voice, intent: v as typeof intents[number] })}>
+                  <SelectTrigger id="intent" className="capitalize"><SelectValue placeholder="Select intent" /></SelectTrigger>
+                  <SelectContent>
+                    {intents.map((i) => (<SelectItem key={i} value={i} className="capitalize">{i}</SelectItem>))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="domain">Domain</Label>
+                <Select value={voice.domain} onValueChange={(v) => setVoice({ ...voice, domain: v as typeof domains[number] })}>
+                  <SelectTrigger id="domain" className="capitalize"><SelectValue placeholder="Select domain" /></SelectTrigger>
+                  <SelectContent>
+                    {domains.map((d) => (<SelectItem key={d} value={d} className="capitalize">{d}</SelectItem>))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 pt-2">
+              <Button onClick={onSave} disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
+              {savedMsg && <div className="text-xs text-emerald-600">{savedMsg}</div>}
+            </div>
+          </>
+        )}
+      </div>
+    </ScrollArea>
+  );
+}

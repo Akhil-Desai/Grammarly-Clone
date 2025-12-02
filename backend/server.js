@@ -6,7 +6,7 @@ import { promises as fs } from "fs";
 import path from "path";
 import crypto from "crypto";
 import { fileURLToPath } from "url";
-import { insertUserRow, ensureUserRow } from "./db/userRepo.js";
+import { insertUserRow, ensureUserRow, getUserSettings, updateUserSettings } from "./db/userRepo.js";
 import { createDocument, listDocumentsByUser, updateDocumentContent, softDeleteDocument, listDeletedDocumentsByUser, restoreDeletedDocument, purgeDeletedDocument } from "./db/documentRepo.js";
 import { generateAI } from "./ai/index.js";
 import { recordMetric, getMetricsSnapshot } from "./metrics.js";
@@ -226,6 +226,76 @@ function buildHardenedPrompt(userText) {
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 //console.log('gemini key present:', genAI);
 
+// ---- Voice settings validation and defaults (MVP) ----
+const VOICE_TONES = new Set(["formal", "neutral", "friendly", "confident", "persuasive", "empathetic"]);
+const VOICE_AUDIENCES = new Set(["general", "expert", "executive", "peer", "customer"]);
+const VOICE_INTENTS = new Set(["inform", "explain", "persuade", "request", "apologize", "congratulate"]);
+const VOICE_DOMAINS = new Set(["general", "academic", "business", "technical", "creative", "legal", "medical"]);
+
+function getDefaultVoice() {
+  return {
+    tone: "neutral",
+    formality: 3, // 1-5
+    audience: "general",
+    intent: "inform",
+    domain: "general",
+  };
+}
+
+function sanitizeVoice(voice) {
+  const out = { ...getDefaultVoice() };
+  if (!voice || typeof voice !== "object") return out;
+  if (typeof voice.formality === "number") {
+    const v = Math.max(1, Math.min(5, Math.round(voice.formality)));
+    out.formality = v;
+  }
+  if (typeof voice.tone === "string" && VOICE_TONES.has(voice.tone)) out.tone = voice.tone;
+  if (typeof voice.audience === "string" && VOICE_AUDIENCES.has(voice.audience)) out.audience = voice.audience;
+  if (typeof voice.intent === "string" && VOICE_INTENTS.has(voice.intent)) out.intent = voice.intent;
+  if (typeof voice.domain === "string" && VOICE_DOMAINS.has(voice.domain)) out.domain = voice.domain;
+  return out;
+}
+
+function mergeSettingsVoice(userSettings, requestSettings) {
+  const u = (userSettings && typeof userSettings === "object") ? userSettings : {};
+  const r = (requestSettings && typeof requestSettings === "object") ? requestSettings : {};
+  const uv = (u.voice && typeof u.voice === "object") ? u.voice : {};
+  const rv = (r.voice && typeof r.voice === "object") ? r.voice : {};
+  return {
+    ...u,
+    ...r,
+    voice: sanitizeVoice({ ...uv, ...rv }),
+  };
+}
+
+// Settings endpoints (MVP): get/update user.settings.voice
+app.get("/api/user/settings", authenticate, async (req, res) => {
+  try {
+    const settings = await getUserSettings(req.user.id);
+    const voice = sanitizeVoice(settings?.voice);
+    return res.json({ settings: { ...settings, voice } });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Failed to fetch settings" });
+  }
+});
+
+app.put("/api/user/settings", authenticate, async (req, res) => {
+  try {
+    const body = req.body || {};
+    const next = {
+      ...(typeof body === "object" ? body : {}),
+    };
+    // Only allow the MVP voice fields for now
+    next.voice = sanitizeVoice(body?.voice);
+    const saved = await updateUserSettings(req.user.id, next);
+    return res.json({ settings: saved || next });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Failed to update settings" });
+  }
+});
+
 app.post("/api/rewrite", authenticate, async (req, res) => {
   try {
     const { text } = req.body;
@@ -352,12 +422,20 @@ app.post("/api/ai/generate", authenticate, async (req, res) => {
       }
     }
     const hasInstruction = (typeof instruction === "string" && instruction.trim().length > 0) || (typeof text === "string" && text.trim().length > 0);
+    // Merge user default settings with request settings (voice MVP)
+    let effectiveSettings = {};
+    try {
+      const userSettings = await getUserSettings(req.user.id);
+      effectiveSettings = mergeSettingsVoice(userSettings || {}, (typeof settings === "object" && settings) ? settings : {});
+    } catch {
+      effectiveSettings = mergeSettingsVoice({}, (typeof settings === "object" && settings) ? settings : {});
+    }
     const result = await generateAI({
       task: typeof task === "string" ? task : "rewrite",
       // treat legacy 'text' as instruction
       instruction: typeof instruction === "string" ? instruction : (typeof text === "string" ? text : ""),
       context: typeof context === "string" ? context : "",
-      settings: typeof settings === "object" && settings ? settings : {},
+      settings: effectiveSettings,
       options: typeof options === "object" && options ? options : {},
       provider: typeof provider === "string" ? provider : undefined,
       userId: req.user?.id || "anon",

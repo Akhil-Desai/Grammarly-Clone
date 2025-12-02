@@ -6,6 +6,7 @@ import { OllamaProvider } from "./providers/ollama.js";
 import { AnthropicProvider } from "./providers/anthropic.js";
 import { OpenAIProvider } from "./providers/openai.js";
 import { recordMetric } from "../metrics.js";
+import { consumeProvider } from "../ratelimiter.js";
 
 function extractJsonObject(text) {
   if (!text) return null;
@@ -116,6 +117,7 @@ export async function generateAI({
   provider: providerOverride,
   // legacy param `text` is treated as instruction if provided
   text,
+  userId,
 } = {}) {
   const prompt = buildPrompt({
     task,
@@ -127,6 +129,24 @@ export async function generateAI({
     const providers = getProvidersInOrder(providerOverride);
     let lastError = null;
     for (const { name, client } of providers) {
+      // Enforce per-user, per-provider RPM before attempting this provider
+      try {
+        const rate = consumeProvider({ userId: userId || "anon", provider: name });
+        if (!rate.allowed) {
+          // If the caller explicitly requested this provider, surface rate limit as error
+          if (providerOverride) {
+            const e = new Error(`Rate limit exceeded for provider: ${name}`);
+            e.status = 429;
+            e.retryAfterMs = rate.retryAfterMs;
+            throw e;
+          }
+          // Otherwise, try next provider
+          lastError = new Error(`Rate limited: ${name}`);
+          continue;
+        }
+      } catch (e) {
+        throw e;
+      }
       try {
         const started = Date.now();
         const output = await client.complete({

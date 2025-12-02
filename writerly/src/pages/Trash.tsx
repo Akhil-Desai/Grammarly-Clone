@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { FileText, RotateCcw, Trash2 } from "lucide-react";
+import { FileText, RotateCcw, Trash2, User } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Link, useNavigate } from "react-router-dom";
 
@@ -73,6 +73,10 @@ const Trash = () => {
           <button className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm bg-muted">
             <Trash2 className="w-4 h-4" />
             Trash
+          </button>
+          <button className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-muted/60 text-muted-foreground" onClick={() => navigate("/account")}>
+            <User className="w-4 h-4" />
+            Account
           </button>
         </nav>
       </aside>

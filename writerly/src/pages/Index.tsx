@@ -4,8 +4,6 @@ import { useAuth } from "@/hooks/use-auth";
 import Header from "@/components/Header";
 import Editor from "@/components/Editor";
 import SuggestionsSidebar from "@/components/SuggestionsSidebar";
-import ToneAnalysisModal from "@/components/ToneAnalysisModal";
-import GoalsDialog from "@/components/GoalsDialog";
 import { useToast } from "@/hooks/use-toast";
 
 interface Suggestion {
@@ -35,9 +33,7 @@ const Index = () => {
   const [content, setContent] = useState("");
   const [suggestions, setSuggestions] = useState<Suggestion[]>(INITIAL_SUGGESTIONS);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [showToneModal, setShowToneModal] = useState(false);
-  const [showGoals, setShowGoals] = useState(false);
-  const [toneAnalysis, setToneAnalysis] = useState<any>(null);
+  // Goals/Tone features removed
   const [title, setTitle] = useState<string | undefined>(undefined);
   const [loadingDoc, setLoadingDoc] = useState<boolean>(!!id);
   const [saving, setSaving] = useState<boolean>(false);
@@ -111,20 +107,7 @@ const Index = () => {
     }, 1500);
   };
 
-  const analyzeTone = () => {
-    setToneAnalysis({
-      tone: "Professional but Apologetic",
-      intent: "Request Extension",
-      confidence: "92%",
-      suggestions: [
-        "Consider being more confident and solution-oriented",
-        "Avoid excessive apologies - focus on solutions instead",
-        "Provide specific dates rather than vague timeframes",
-        "Lead with the solution, not the problem",
-      ],
-    });
-    setShowToneModal(true);
-  };
+  // Tone/Goals removed
 
   const handleApplySuggestion = (id: string, replacement: string) => {
     const suggestion = suggestions.find((s) => s.id === id);
@@ -206,6 +189,16 @@ const Index = () => {
   };
 
   const score = Math.max(0, 100 - suggestions.length * 3);
+  const words = React.useMemo(() => String(content || "").trim().split(/\s+/).filter(Boolean).length, [content]);
+  const chars = content.length;
+  const sentences = React.useMemo(() => {
+    const s = String(content || "").trim();
+    if (!s) return 0;
+    const parts = s.split(/(?<=[\.!\?])\s+/).filter(Boolean);
+    return parts.length;
+  }, [content]);
+  const readingSeconds = Math.max(1, Math.round((words / 200) * 60));
+  const speakingSeconds = Math.max(1, Math.round((words / 130) * 60));
 
   useEffect(() => {
     if (!id) return;
@@ -355,7 +348,12 @@ const Index = () => {
     <div className="min-h-screen flex flex-col bg-background">
       <div className="flex-1 flex overflow-visible pr-[420px]">
         <div className="flex-1 flex flex-col">
-          <Header title={title} score={score} onOpenGoals={() => setShowGoals(true)} onTitleChange={setTitle} />
+          <Header
+            title={title}
+            score={score}
+            onTitleChange={setTitle}
+            performance={{ words, chars, sentences, readingSeconds, speakingSeconds, score }}
+          />
           <Editor 
             content={content} 
             onChange={setContent} 
@@ -394,12 +392,7 @@ const Index = () => {
           onApplyAll={handleApplyAllAi}
         />
       </div>
-      <GoalsDialog open={showGoals} onOpenChange={setShowGoals} onAnalyze={analyzeTone} />
-      <ToneAnalysisModal
-        open={showToneModal}
-        onOpenChange={setShowToneModal}
-        analysis={toneAnalysis}
-      />
+      {/* Goals/Tone removed */}
     </div>
   );
 };

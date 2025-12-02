@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { FileText, Plus, Upload, Search, Trash2, User, Clock } from "lucide-react";
+import { FileText, Plus, Upload, Search, Trash2, User } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useEffect, useState } from "react";
 
@@ -89,10 +89,6 @@ const Home = () => {
             <FileText className="w-4 h-4" />
             Docs
           </Link>
-          <button className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-muted/60 text-muted-foreground">
-            <Clock className="w-4 h-4" />
-            Version history
-          </button>
           <button className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-muted/60 text-muted-foreground" onClick={() => navigate("/trash")}>
             <Trash2 className="w-4 h-4" />
             Trash

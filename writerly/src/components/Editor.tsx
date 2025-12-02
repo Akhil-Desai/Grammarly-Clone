@@ -1,4 +1,7 @@
 import React from "react";
+import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ChevronUp } from "lucide-react";
 
 interface Highlight {
   text: string;
@@ -114,8 +117,6 @@ const Editor = ({ content, onChange, onAnalyze, highlights = [], ranges = [] }: 
               className="absolute inset-0 pointer-events-none whitespace-pre-wrap break-words text-lg leading-relaxed text-foreground"
               style={{
                 padding: "0.5rem 0.75rem",
-                // Match textarea styles exactly for alignment
-                // Tailwind classes applied on textarea below; keep style parity here
               }}
               dangerouslySetInnerHTML={{ __html: highlightedHtml }}
             />
@@ -129,13 +130,46 @@ const Editor = ({ content, onChange, onAnalyze, highlights = [], ranges = [] }: 
                 color: "transparent",
                 caretColor: "hsl(var(--foreground))",
                 padding: "0.5rem 0.75rem",
-                // Ensure the same font metrics as overlay (inherits from page)
               }}
               aria-label="Editor"
             />
           </div>
         </div>
       </div>
+
+      {/* Bottom stats bar */}
+      {(() => {
+        const words = React.useMemo(() => String(content || "").trim().split(/\s+/).filter(Boolean).length, [content]);
+        const chars = content.length;
+        const readingSeconds = Math.max(1, Math.round((words / 200) * 60));
+        const speakingSeconds = Math.max(1, Math.round((words / 130) * 60));
+        return (
+          <div className="p-3 bg-background border-t">
+            <div className="flex items-center justify-center">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="rounded-md shadow-sm">
+                    {words} words
+                    <ChevronUp className="ml-2 h-4 w-4" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="end" className="w-64 p-0">
+                  <div className="p-3 space-y-2">
+                    <div className="rounded-md border px-3 py-2 font-semibold">{words} words</div>
+                    <div className="px-3 py-1">{chars.toLocaleString()} characters</div>
+                    <div className="px-3 py-1">
+                      {Math.floor(readingSeconds / 60)} min {readingSeconds % 60} sec reading time
+                    </div>
+                    <div className="px-3 py-1">
+                      {Math.floor(speakingSeconds / 60)} min {speakingSeconds % 60} sec speaking time
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 };

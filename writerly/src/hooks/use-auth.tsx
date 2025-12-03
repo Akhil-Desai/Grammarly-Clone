@@ -1,5 +1,9 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
+const BACKEND_URL =
+  (typeof import.meta !== "undefined" && (import.meta as any)?.env?.VITE_BACKEND_URL) ||
+  "https://grammarly-clone.onrender.com";
+
 type User = {
   id: string;
   email: string;
@@ -35,7 +39,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const fetchMe = useCallback(async (t: string) => {
-    const res = await fetch("/api/auth/me", {
+    const res = await fetch(`${BACKEND_URL}/api/auth/me`, {
       headers: { Authorization: `Bearer ${t}` },
     });
     if (!res.ok) throw new Error("Unauthorized");
@@ -61,7 +65,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [token, fetchMe, saveToken]);
 
   const login = useCallback(async (email: string, password: string) => {
-    const res = await fetch("/api/auth/login", {
+    const res = await fetch(`${BACKEND_URL}/api/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
@@ -78,7 +82,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [saveToken]);
 
   const signup = useCallback(async (email: string, password: string) => {
-    const res = await fetch("/api/auth/register", {
+    const res = await fetch(`${BACKEND_URL}/api/auth/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
@@ -103,7 +107,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     async (input: RequestInfo | URL, init?: RequestInit) => {
       const headers: Record<string, string> = { ...(init?.headers as any) };
       if (token) headers.Authorization = `Bearer ${token}`;
-      const res = await fetch(input, { ...init, headers });
+      // Prepend backend URL if input is a relative path
+      let url = input;
+      if (typeof input === "string" && input.startsWith("/")) {
+        url = `${BACKEND_URL}${input}`;
+      }
+      const res = await fetch(url, { ...init, headers });
       if (res.status === 401) {
         // token invalid -> logout
         logout();
@@ -135,5 +144,3 @@ export function useAuth() {
   if (!ctx) throw new Error("useAuth must be used within AuthProvider");
   return ctx;
 }
-
-

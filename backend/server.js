@@ -26,6 +26,11 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Health check endpoint
+app.get("/", (req, res) => {
+  res.json({ status: "healthy", timestamp: new Date().toISOString() });
+});
+
 // Ensure data dir exists
 async function ensureDataFiles() {
   try {

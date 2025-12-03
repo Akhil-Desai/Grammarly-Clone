@@ -6,6 +6,10 @@ import Editor from "@/components/Editor";
 import SuggestionsSidebar from "@/components/SuggestionsSidebar";
 import { useToast } from "@/hooks/use-toast";
 
+const BACKEND_URL =
+  (typeof import.meta !== "undefined" && (import.meta as any)?.env?.VITE_BACKEND_URL) ||
+  "https://grammarly-clone.onrender.com";
+
 interface Suggestion {
   id: string;
   type: "grammar" | "spelling" | "clarity" | "style";
@@ -52,7 +56,7 @@ const Index = () => {
     }
 
     setIsAnalyzing(true);
-    
+
     // Simulate AI analysis with relevant suggestions
     setTimeout(() => {
       const mockSuggestions: Suggestion[] = [
@@ -324,7 +328,7 @@ const Index = () => {
       try {
         // Use fetch with keepalive to allow the request to complete during unload
         // Note: request body size must be small (<64KB) for keepalive.
-        fetch(`/api/documents/${id}`, {
+        fetch(`${BACKEND_URL}/api/documents/${id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ content, metadata: { title: title || "Untitled document" } }),
@@ -354,9 +358,9 @@ const Index = () => {
             onTitleChange={setTitle}
             performance={{ words, chars, sentences, readingSeconds, speakingSeconds, score }}
           />
-          <Editor 
-            content={content} 
-            onChange={setContent} 
+          <Editor
+            content={content}
+            onChange={setContent}
             onAnalyze={analyzText}
             ranges={suggestions
               .filter(s =>

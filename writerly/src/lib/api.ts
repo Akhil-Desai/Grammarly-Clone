@@ -8,7 +8,7 @@ export type GenerateOptions = {
 
 const BACKEND_URL =
   (typeof import.meta !== "undefined" && (import.meta as any)?.env?.VITE_BACKEND_URL) ||
-  "http://localhost:5001";
+  "https://grammarly-clone.onrender.com";
 
 function getStoredToken(): string | null {
   try {

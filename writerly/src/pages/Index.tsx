@@ -326,12 +326,17 @@ const Index = () => {
     if (!id) return;
     const flushSave = () => {
       if (content === lastSyncedRef.current && (title || "") === lastSyncedTitleRef.current) return;
+      // Get token from localStorage for beforeunload (can't use React state in event handler)
+      const token = localStorage.getItem("auth_token");
       try {
         // Use fetch with keepalive to allow the request to complete during unload
         // Note: request body size must be small (<64KB) for keepalive.
         fetch(`${BACKEND_URL}/api/documents/${id}`, {
           method: "PUT",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+          },
           body: JSON.stringify({ content, metadata: { title: title || "Untitled document" } }),
           keepalive: true,
         }).catch(() => {});

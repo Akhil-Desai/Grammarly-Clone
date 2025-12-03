@@ -19,7 +19,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const DATA_DIR = path.join(__dirname, ".data");
 const USERS_FILE = path.join(DATA_DIR, "users.json");
-const TOKEN_TTL_SECONDS = 15 * 60; // 15 minutes
+const TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days
 const AUTH_SECRET = process.env.JWT_SECRET || process.env.AUTH_SECRET || "dev-secret-change-me";
 
 const app = express();

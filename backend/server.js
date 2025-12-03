@@ -149,6 +149,10 @@ app.post("/api/auth/register", async (req, res) => {
   }
 });
 
+app.get("/", (req, res) => {
+  res.json({ status: "healthy", timestamp: new Date().toISOString() });
+});
+
 app.post("/api/auth/login", async (req, res) => {
   try {
     const { email, password } = req.body || {};

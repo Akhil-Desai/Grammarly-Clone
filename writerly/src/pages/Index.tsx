@@ -33,7 +33,7 @@ const INITIAL_SUGGESTIONS: Suggestion[] = [];
 
 const Index = () => {
   const { id } = useParams<{ id: string }>();
-  const { authorizedFetch } = useAuth();
+  const { authorizedFetch, initializing } = useAuth();
   const [content, setContent] = useState("");
   const [suggestions, setSuggestions] = useState<Suggestion[]>(INITIAL_SUGGESTIONS);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -205,7 +205,8 @@ const Index = () => {
   const speakingSeconds = Math.max(1, Math.round((words / 130) * 60));
 
   useEffect(() => {
-    if (!id) return;
+    // Don't fetch until auth is initialized
+    if (!id || initializing) return;
     let cancelled = false;
     (async () => {
       setLoadingDoc(true);
@@ -236,7 +237,7 @@ const Index = () => {
       }
     })();
     return () => { cancelled = true; };
-  }, [id, authorizedFetch]);
+  }, [id, authorizedFetch, initializing]);
 
   // Debounced grammar check on content edits
   useEffect(() => {

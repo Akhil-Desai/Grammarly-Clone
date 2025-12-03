@@ -11,7 +11,7 @@ const demoPreview = `Hi Sarah,\n\nI wanted to reach out to you about the project
 
 const Home = () => {
   const navigate = useNavigate();
-  const { authorizedFetch, logout } = useAuth();
+  const { authorizedFetch, logout, initializing } = useAuth();
   const [creating, setCreating] = useState(false);
   const [docs, setDocs] = useState<Array<any>>([]);
   const [loadingDocs, setLoadingDocs] = useState(true);
@@ -50,6 +50,9 @@ const Home = () => {
   }
 
   useEffect(() => {
+    // Don't fetch until auth is initialized
+    if (initializing) return;
+
     let cancelled = false;
     (async () => {
       setLoadingDocs(true);
@@ -70,7 +73,7 @@ const Home = () => {
       }
     })();
     return () => { cancelled = true; };
-  }, [authorizedFetch]);
+  }, [authorizedFetch, initializing]);
   return (
     <div className="min-h-screen bg-background text-foreground flex">
       {/* Sidebar */}
@@ -200,5 +203,3 @@ const Home = () => {
 };
 
 export default Home;
-
-

@@ -6,13 +6,16 @@ import { useAuth } from "@/hooks/use-auth";
 import { Link, useNavigate } from "react-router-dom";
 
 const Trash = () => {
-  const { authorizedFetch, logout } = useAuth();
+  const { authorizedFetch, logout, initializing } = useAuth();
   const navigate = useNavigate();
   const [docs, setDocs] = useState<Array<any>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Don't fetch until auth is initialized
+    if (initializing) return;
+
     let cancelled = false;
     (async () => {
       setLoading(true);
@@ -31,7 +34,7 @@ const Trash = () => {
       }
     })();
     return () => { cancelled = true; };
-  }, [authorizedFetch]);
+  }, [authorizedFetch, initializing]);
 
   async function restoreDoc(id: string) {
     const res = await authorizedFetch(`/api/deleted-documents/${id}/restore`, { method: "POST" });
@@ -134,5 +137,3 @@ const Trash = () => {
 };
 
 export default Trash;
-
-

@@ -12,7 +12,7 @@ const BACKEND_URL =
 
 function getStoredToken(): string | null {
   try {
-    return localStorage.getItem("writerly.token");
+    return localStorage.getItem("auth_token");
   } catch {
     return null;
   }
@@ -20,7 +20,7 @@ function getStoredToken(): string | null {
 
 function setStoredToken(token: string) {
   try {
-    localStorage.setItem("writerly.token", token);
+    localStorage.setItem("auth_token", token);
   } catch {}
 }
 
@@ -96,5 +96,3 @@ export async function callGenerate(opts: GenerateOptions): Promise<{ text: strin
   }
   return { text: data?.text || "", provider: data?.meta?.provider, status: resp.status };
 }
-
-

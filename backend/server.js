@@ -366,7 +366,7 @@ app.post("/api/grammar/check", authenticate, async (req, res) => {
     }
     const LT_URL = process.env.LT_URL || "http://localhost:8010";
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 1500);
+    const timeout = setTimeout(() => controller.abort(), 10000);
     const params = new URLSearchParams();
     params.set("text", text);
     params.set("language", typeof language === "string" ? language : "en-US");
